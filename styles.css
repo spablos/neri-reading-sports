@@ -313,6 +313,23 @@ body {
 }
 #refresh-btn:hover { transform: scale(1.1); }
 
+/* Update available indicator */
+#version-bar.update-available { opacity: 1; }
+#version-bar.update-available #refresh-btn {
+    background: #FF5722;
+    border-color: #FF5722;
+    color: #fff;
+    animation: updatePulse 1.5s ease-in-out infinite;
+}
+#version-bar.update-available #version-label {
+    color: #FF5722;
+    font-weight: 700;
+}
+@keyframes updatePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,87,34,0.4); }
+    50% { box-shadow: 0 0 12px 4px rgba(255,87,34,0.6); }
+}
+
 /* Start screen version bar — same position as game screen */
 #version-bar-start {
     position: fixed;

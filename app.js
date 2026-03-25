@@ -1231,4 +1231,5 @@ class Game {
 document.addEventListener('DOMContentLoaded', () => {
     const game = new Game();
     game.init();
+    window._game = game; // expose for refresh button
 });

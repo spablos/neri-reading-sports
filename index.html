@@ -100,7 +100,7 @@
 
         <!-- Refresh button + version (subtle, bottom-right corner) -->
         <div id="version-bar">
-            <span id="version-label">v1</span>
+            <span id="version-label">v1.1</span>
             <button id="refresh-btn" title="עדכן גירסה">🔄</button>
         </div>
 
@@ -113,7 +113,7 @@
             </div>
             <!-- Refresh button also on start screen -->
             <div id="version-bar-start">
-                <span class="version-label-copy">v1</span>
+                <span class="version-label-copy">v1.1</span>
                 <button class="refresh-btn-copy" title="עדכן גירסה">🔄</button>
             </div>
         </div>
@@ -128,8 +128,28 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
-        // Refresh: clear caches, save current state, reload
+        // Current client version (must match version.json on deploy)
+        const CLIENT_VERSION = '1.1';
+
+        // Check for newer version on server every 5 minutes
+        async function checkForUpdate() {
+            try {
+                const resp = await fetch('version.json?t=' + Date.now());
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data.version && data.version !== CLIENT_VERSION) {
+                    document.getElementById('version-bar').classList.add('update-available');
+                    document.getElementById('version-label').textContent = CLIENT_VERSION + ' → ' + data.version;
+                }
+            } catch(_) {}
+        }
+        checkForUpdate();
+        setInterval(checkForUpdate, 60 * 1000);
+
+        // Refresh: save state, clear caches, reload
         async function hardRefresh() {
+            // Save current player/fact before reloading
+            if (window._game) window._game.saveState();
             if ('serviceWorker' in navigator) {
                 const regs = await navigator.serviceWorker.getRegistrations();
                 for (const reg of regs) await reg.unregister();
