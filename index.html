@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>נרי לומד לקרוא</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;900&family=Noto+Sans+Hebrew:wght@400;700;900&family=Secular+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Floating decorations -->
+        <div id="floating-decorations"></div>
+
+        <!-- Title -->
+        <header id="title-bar">
+            <h1 id="main-title"></h1>
+            <!-- Mode tabs (fun facts tab hidden until unlocked) -->
+            <div id="mode-tabs" class="hidden">
+                <button class="mode-tab active" data-mode="players">⚽ שחקנים</button>
+                <button class="mode-tab" data-mode="funfacts">🧠 חידות</button>
+            </div>
+        </header>
+
+        <!-- Score Panel -->
+        <div id="score-panel">
+            <div id="score-label">ניקוד</div>
+            <div id="score-value">0</div>
+            <div id="streak-display"></div>
+            <div id="rewards-shelf"></div>
+        </div>
+
+        <!-- Main Game Area -->
+        <div id="game-container">
+            <!-- Question Card (fun facts mode) -->
+            <div id="question-card" class="hidden">
+                <div id="question-emoji">🧠</div>
+                <div id="question-text"></div>
+                <div id="question-buttons">
+                    <button id="hear-question-btn" title="שמע שוב את השאלה">🔊</button>
+                </div>
+            </div>
+
+            <!-- Player Card -->
+            <div id="player-card">
+                <div id="player-avatar"></div>
+                <div id="team-row">
+                    <img id="team-logo" src="" alt="" width="24" height="24">
+                    <div id="team-names">
+                        <div id="player-team"></div>
+                        <div id="player-team-en"></div>
+                    </div>
+                </div>
+                <div id="card-buttons">
+                    <button id="hear-name-card-btn" title="שמע את השם">🔊</button>
+                    <button id="hear-desc-btn" title="שמע על השחקן">🎙️</button>
+                </div>
+            </div>
+
+            <!-- Drop Zones (name placeholder) -->
+            <div id="name-area">
+                <div id="drop-zones"></div>
+                <button id="hear-name-btn" title="שמע את השם">🔊</button>
+                <button id="skip-btn" title="דלג">⏭️</button>
+            </div>
+
+            <!-- Hint button (shown below drop zones) -->
+            <div id="action-buttons">
+                <button id="hint-btn" class="hidden" title="רמז">💡 רמז</button>
+            </div>
+
+            <!-- Draggable Tokens -->
+            <div id="tokens-area">
+                <div id="tokens-container"></div>
+            </div>
+        </div>
+
+        <!-- Feedback Overlay -->
+        <div id="feedback-overlay" class="hidden">
+            <div id="feedback-content"></div>
+        </div>
+
+        <!-- Celebration Overlay -->
+        <div id="celebration-overlay" class="hidden">
+            <div id="celebration-content"></div>
+        </div>
+
+        <!-- Milestone Reward Overlay -->
+        <div id="milestone-overlay" class="hidden">
+            <div id="milestone-content"></div>
+        </div>
+
+        <!-- Refresh button + version (subtle, bottom-right corner) -->
+        <div id="version-bar">
+            <span id="version-label">v1</span>
+            <button id="refresh-btn" title="עדכן גירסה">🔄</button>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen">
+            <div id="start-content">
+                <h1 id="start-title"></h1>
+                <div id="start-soccer">⚽</div>
+                <button id="start-btn">בואו נתחיל!</button>
+            </div>
+            <!-- Refresh button also on start screen -->
+            <div id="version-bar-start">
+                <span class="version-label-copy">v1</span>
+                <button class="refresh-btn-copy" title="עדכן גירסה">🔄</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="players.js"></script>
+    <script src="descriptions.js"></script>
+    <script src="funfacts.js"></script>
+    <script src="hebrew.js"></script>
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+        // Refresh: clear caches, save current state, reload
+        async function hardRefresh() {
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) await reg.unregister();
+            }
+            const keys = await caches.keys();
+            for (const key of keys) await caches.delete(key);
+            location.reload(true);
+        }
+        document.getElementById('refresh-btn').onclick = hardRefresh;
+        document.querySelector('.refresh-btn-copy').onclick = hardRefresh;
+    </script>
+</body>
+</html>

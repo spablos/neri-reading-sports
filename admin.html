@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — נרי לומד לקרוא</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&family=Noto+Sans+Hebrew:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Rubik', sans-serif; background: #f5f5f5; padding: 20px; direction: rtl; }
+        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        .controls { text-align: center; margin-bottom: 20px; }
+        .controls button { padding: 8px 20px; margin: 0 5px; font-size: 1rem; border-radius: 8px; border: 2px solid #333; cursor: pointer; background: #fff; }
+        .controls button.active { background: #4CAF50; color: #fff; border-color: #4CAF50; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        th { background: #333; color: #fff; padding: 10px 8px; text-align: right; font-size: 0.85rem; position: sticky; top: 0; }
+        td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle; font-size: 0.85rem; }
+        tr:hover { background: #f0f8ff; }
+        .name-nikud { font-family: 'Noto Sans Hebrew', sans-serif; font-size: 1.1rem; font-weight: 700; }
+        .play-btn { background: #4CAF50; color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; cursor: pointer; }
+        .play-btn:hover { background: #388E3C; }
+        .play-btn.playing { background: #FF5722; }
+        .status-select { padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; }
+        .status-ok { background: #E8F5E9; }
+        .status-bad { background: #FFEBEE; }
+        .status-unchecked { background: #FFF3E0; }
+        .notes-input { width: 100%; padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.8rem; }
+        .token-preview { font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.8rem; color: #666; direction: rtl; }
+        .export-btn { margin-top: 20px; padding: 12px 30px; font-size: 1rem; background: #1976D2; color: #fff; border: none; border-radius: 8px; cursor: pointer; display: block; margin-left: auto; margin-right: auto; }
+        .img-thumb { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        #stop-all { background: #FF5722; color: #fff; }
+    </style>
+</head>
+<body>
+    <h1>Back Office — נרי לומד לקרוא</h1>
+    <div class="controls">
+        <button id="play-all">▶️ Play All Sequentially</button>
+        <button id="stop-all">⏹ Stop</button>
+        <button id="filter-bad">Show Bad Only</button>
+        <button id="clear-all" style="background:#FF5722;color:#fff;border-color:#FF5722">🗑️ Clear All Reviews</button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Image</th>
+                <th>Game Name (nikud)</th>
+                <th>Display Name</th>
+                <th>Tokens (TTS)</th>
+                <th>Name Audio</th>
+                <th>Description Audio</th>
+                <th>Status</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody id="player-list"></tbody>
+    </table>
+    <button class="export-btn" id="export-btn">📋 Export Players Review to Clipboard</button>
+
+    <h1 style="margin-top:40px">🧠 Fun Facts — חידות</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Category</th>
+                <th>Question</th>
+                <th>Answer (nikud)</th>
+                <th>Q Audio</th>
+                <th>A Audio</th>
+                <th>Status</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody id="funfacts-list"></tbody>
+    </table>
+    <button class="export-btn" id="export-ff-btn">📋 Export Fun Facts Review to Clipboard</button>
+
+    <script src="players.js"></script>
+    <script src="descriptions.js"></script>
+    <script src="funfacts.js"></script>
+    <script src="hebrew.js"></script>
+    <script>
+        const tbody = document.getElementById('player-list');
+        const withImages = PLAYERS.filter(p => p.image);
+        let currentAudio = null;
+        let playingBtn = null;
+
+        // Load saved reviews
+        const savedReviews = JSON.parse(localStorage.getItem('neri-admin-reviews') || '{}');
+
+        function stopAudio() {
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+            if (window.speechSynthesis) speechSynthesis.cancel();
+            if (playingBtn) { playingBtn.classList.remove('playing'); playingBtn.textContent = '▶'; playingBtn = null; }
+        }
+
+        function playAudio(src, btn) {
+            // Toggle: if this button is already playing, stop it
+            if (btn === playingBtn) {
+                stopAudio();
+                return;
+            }
+            stopAudio();
+            btn.classList.add('playing');
+            btn.textContent = '⏹';
+            playingBtn = btn;
+            currentAudio = new Audio(src);
+            currentAudio.onended = () => { btn.classList.remove('playing'); btn.textContent = '▶'; playingBtn = null; };
+            currentAudio.onerror = () => { btn.classList.remove('playing'); btn.textContent = '❌'; };
+            currentAudio.play().catch(() => { btn.textContent = '❌'; });
+        }
+
+        function speakTTS(text, btn) {
+            // Toggle: if this button is already playing, stop it
+            if (btn === playingBtn) {
+                stopAudio();
+                return;
+            }
+            stopAudio();
+            btn.classList.add('playing');
+            btn.textContent = '⏹';
+            playingBtn = btn;
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'he-IL';
+            u.rate = 0.6;
+            u.onend = () => { btn.classList.remove('playing'); btn.textContent = '🔊'; playingBtn = null; };
+            speechSynthesis.speak(u);
+        }
+
+        function saveReviews() {
+            const reviews = {};
+            withImages.forEach(p => {
+                const sel = document.getElementById('status-' + p.id);
+                const notes = document.getElementById('notes-' + p.id);
+                reviews[p.id] = { status: sel.value, notes: notes.value };
+            });
+            localStorage.setItem('neri-admin-reviews', JSON.stringify(reviews));
+        }
+
+        withImages.forEach(p => {
+            const tokens = HEBREW.tokenize(p.name).filter(t => t !== ' ');
+            const sounds = Syllables.build(tokens);
+            const tokenPreview = tokens.map((t, i) => t + '→' + sounds[i]).join(' | ');
+            const review = savedReviews[p.id] || { status: 'unchecked', notes: '' };
+            const descText = (typeof DESCRIPTIONS !== 'undefined' && DESCRIPTIONS[p.id]) || '';
+
+            const tr = document.createElement('tr');
+            tr.id = 'row-' + p.id;
+            tr.innerHTML = `
+                <td>${p.id}</td>
+                <td><img class="img-thumb" src="${p.image}" onerror="this.src='icon-192.png'"></td>
+                <td><span class="name-nikud">${p.name}</span><br><small>${p.fullName}</small></td>
+                <td style="font-size:0.75rem; max-width:200px">${descText.substring(0, 80)}...</td>
+                <td><span class="token-preview">${tokenPreview}</span></td>
+                <td>
+                    <button class="play-btn" id="name-btn-${p.id}" onclick="playAudio('audio/names/${p.id}.mp3?t=${Date.now()}', this)">▶</button>
+                </td>
+                <td>
+                    <button class="play-btn" id="desc-btn-${p.id}" onclick="playAudio('audio/${p.id}.mp3?t=${Date.now()}', this)">▶</button>
+                </td>
+                <td>
+                    <select class="status-select status-${review.status}" id="status-${p.id}" onchange="this.className='status-select status-'+this.value; saveReviews()">
+                        <option value="unchecked" ${review.status==='unchecked'?'selected':''}>⬜ Unchecked</option>
+                        <option value="ok" ${review.status==='ok'?'selected':''}>✅ OK</option>
+                        <option value="bad" ${review.status==='bad'?'selected':''}>❌ Bad</option>
+                    </select>
+                </td>
+                <td><input class="notes-input" id="notes-${p.id}" value="${review.notes}" onchange="saveReviews()" placeholder="Notes..."></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Stop button
+        document.getElementById('stop-all').onclick = stopAudio;
+
+        // Play all sequentially
+        document.getElementById('play-all').onclick = () => {
+            let idx = 0;
+            function playNext() {
+                if (idx >= withImages.length) return;
+                const p = withImages[idx];
+                const btn = document.getElementById('name-btn-' + p.id);
+                const row = document.getElementById('row-' + p.id);
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                speakTTS(p.name, btn);
+                const u = speechSynthesis;
+                const check = setInterval(() => {
+                    if (!u.speaking) {
+                        clearInterval(check);
+                        idx++;
+                        setTimeout(playNext, 500);
+                    }
+                }, 200);
+            }
+            playNext();
+        };
+
+        // Filter bad only
+        let showBadOnly = false;
+        document.getElementById('filter-bad').onclick = (e) => {
+            showBadOnly = !showBadOnly;
+            e.target.classList.toggle('active', showBadOnly);
+            withImages.forEach(p => {
+                const row = document.getElementById('row-' + p.id);
+                const sel = document.getElementById('status-' + p.id);
+                row.style.display = (showBadOnly && sel.value !== 'bad') ? 'none' : '';
+            });
+        };
+
+        // Clear all reviews
+        document.getElementById('clear-all').onclick = () => {
+            if (!confirm('Clear all reviews and notes?')) return;
+            localStorage.removeItem('neri-admin-reviews');
+            localStorage.removeItem('neri-admin-ff-reviews');
+            location.reload();
+        };
+
+        // Export
+        document.getElementById('export-btn').onclick = () => {
+            const lines = ['ID | Name | Status | Notes'];
+            withImages.forEach(p => {
+                const sel = document.getElementById('status-' + p.id);
+                const notes = document.getElementById('notes-' + p.id);
+                lines.push(`${p.id} | ${p.fullName} | ${sel.value} | ${notes.value}`);
+            });
+            navigator.clipboard.writeText(lines.join('\n')).then(() => alert('Copied to clipboard!'));
+        };
+
+        // ===== Fun Facts Table =====
+        const ffBody = document.getElementById('funfacts-list');
+        const savedFF = JSON.parse(localStorage.getItem('neri-admin-ff-reviews') || '{}');
+        const catEmoji = { worldcup: '🏆', champions: '⚽', israel: '🇮🇱', nba: '🏀' };
+
+        if (typeof FUN_FACTS !== 'undefined') {
+            FUN_FACTS.forEach((ff, i) => {
+                const idx = i + 1;
+                const review = savedFF[idx] || { status: 'unchecked', notes: '' };
+                const tr = document.createElement('tr');
+                tr.id = 'ff-row-' + idx;
+                tr.innerHTML = `
+                    <td>${idx}</td>
+                    <td>${catEmoji[ff.category] || '❓'} ${ff.category}</td>
+                    <td style="direction:rtl; font-weight:700">${ff.q}</td>
+                    <td class="name-nikud" style="direction:rtl">${ff.a}</td>
+                    <td><button class="play-btn" onclick="playAudio('audio/funfacts/q${idx}.mp3?t=${Date.now()}', this)">▶</button></td>
+                    <td><button class="play-btn" onclick="playAudio('audio/funfacts/a${idx}.mp3?t=${Date.now()}', this)">▶</button></td>
+                    <td>
+                        <select class="status-select status-${review.status}" id="ff-status-${idx}" onchange="this.className='status-select status-'+this.value; saveFFReviews()">
+                            <option value="unchecked" ${review.status==='unchecked'?'selected':''}>⬜ Unchecked</option>
+                            <option value="ok" ${review.status==='ok'?'selected':''}>✅ OK</option>
+                            <option value="bad" ${review.status==='bad'?'selected':''}>❌ Bad</option>
+                        </select>
+                    </td>
+                    <td><input class="notes-input" id="ff-notes-${idx}" value="${review.notes}" onchange="saveFFReviews()" placeholder="Notes..."></td>
+                `;
+                ffBody.appendChild(tr);
+            });
+        }
+
+        function saveFFReviews() {
+            const reviews = {};
+            FUN_FACTS.forEach((_, i) => {
+                const idx = i + 1;
+                reviews[idx] = {
+                    status: document.getElementById('ff-status-' + idx).value,
+                    notes: document.getElementById('ff-notes-' + idx).value,
+                };
+            });
+            localStorage.setItem('neri-admin-ff-reviews', JSON.stringify(reviews));
+        }
+
+        document.getElementById('export-ff-btn').onclick = () => {
+            const lines = ['# | Category | Question | Answer | Status | Notes'];
+            FUN_FACTS.forEach((ff, i) => {
+                const idx = i + 1;
+                const sel = document.getElementById('ff-status-' + idx);
+                const notes = document.getElementById('ff-notes-' + idx);
+                lines.push(`${idx} | ${ff.category} | ${ff.q} | ${ff.a} | ${sel.value} | ${notes.value}`);
+            });
+            navigator.clipboard.writeText(lines.join('\n')).then(() => alert('Copied to clipboard!'));
+        };
+    </script>
+</body>
+</html>
