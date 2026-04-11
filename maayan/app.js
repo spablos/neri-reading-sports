@@ -116,6 +116,10 @@ const WRONG_AUDIO    = buildPraise('wrong-letter', 3);
 
 // Text shown on screen — matched to the personal recordings in each folder.
 // Index i corresponds to file (i+1).opus in the matching audio folder.
+const MILESTONE_TEXTS = [
+    '!כל הכבוד',          // 1.mp3
+    '!מדהים',             // 2.mp3
+];
 const CORRECT_TEXTS = [
     '!כל הכבוד',          // 1.opus
     '!יפה מאוד',          // 2.opus
@@ -188,12 +192,11 @@ class Game {
         this.isAnimating = false;
         this.audioPlayer = null;
 
-        // Persistent score — load from localStorage
-        const saved = JSON.parse(localStorage.getItem('maayan-game-state') || '{}');
-        this.score = saved.score || 0;
-        this.milestoneCount = saved.milestoneCount || 0;
-        this.totalCompleted = saved.totalCompleted || 0; // total names completed (for unlock)
-        this.funFactsUnlocked = saved.funFactsUnlocked || false;
+        // Persistent score — loaded in init() from server then localStorage
+        this.score = 0;
+        this.milestoneCount = 0;
+        this.totalCompleted = 0;
+        this.funFactsUnlocked = false;
 
         // ---- Player pool — fully random from all players with images ----
         const withImages = PLAYERS.filter(p => p.image);
@@ -255,7 +258,7 @@ class Game {
 
     // Persist game state to localStorage
     saveState() {
-        localStorage.setItem('maayan-game-state', JSON.stringify({
+        const state = {
             score: this.score,
             milestoneCount: this.milestoneCount,
             totalCompleted: this.totalCompleted,
@@ -264,7 +267,21 @@ class Game {
             currentPlayerId: this.currentPlayer ? this.currentPlayer.id : null,
             currentFactIdx: this.currentFact ? this.currentFact._origIdx : null,
             lastActiveTime: Date.now(),
-        }));
+        };
+        localStorage.setItem('maayan-game-state', JSON.stringify(state));
+        this.syncToServer(state);
+    }
+
+    // Debounced server sync
+    syncToServer(state) {
+        clearTimeout(this._syncTimer);
+        this._syncTimer = setTimeout(() => {
+            fetch('/maayan/api/state/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state }),
+            }).catch(() => {});
+        }, 2000);
     }
 
     // Pick next player — random from shuffled pool, no repeat within last 5
@@ -293,6 +310,31 @@ class Game {
         return track(this.allPool[Math.floor(Math.random() * this.allPool.length)]);
     }
 
+    async loadState() {
+        // Try server first
+        try {
+            const resp = await fetch('/maayan/api/state/load');
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.score !== undefined) {
+                    this.applyState(data);
+                    localStorage.setItem('maayan-game-state', JSON.stringify(data));
+                    return;
+                }
+            }
+        } catch(_) {}
+        // Fallback to localStorage
+        const saved = JSON.parse(localStorage.getItem('maayan-game-state') || '{}');
+        this.applyState(saved);
+    }
+
+    applyState(saved) {
+        this.score = saved.score || 0;
+        this.milestoneCount = saved.milestoneCount || 0;
+        this.totalCompleted = saved.totalCompleted || 0;
+        this.funFactsUnlocked = saved.funFactsUnlocked || false;
+    }
+
     init() {
         Speech.init();
         this.buildTitle();
@@ -304,8 +346,10 @@ class Game {
         // Skip button — always active, always visible
         this.dom.skipBtn.onclick = () => this.skipCurrent();
 
-        // Restore displayed score from persistent state
-        this.dom.scoreValue.textContent = this.score;
+        // Load state from server, then restore displayed score
+        this.loadState().then(() => {
+            this.dom.scoreValue.textContent = this.score;
+        });
 
         // Shortcut: triple-tap the score to toggle fun facts lock/unlock
         let tapCount = 0;
@@ -619,6 +663,12 @@ class Game {
         this.stopAllAudio();
 
         this.currentPlayer = specificPlayer || this.pickNextPlayer();
+        // Track as recent to prevent immediate repeat (especially after restore)
+        if (specificPlayer) {
+            if (!this._recentIds) this._recentIds = [];
+            this._recentIds.push(specificPlayer.id);
+            if (this._recentIds.length > 5) this._recentIds.shift();
+        }
         this.currentFact = null;
         const p = this.currentPlayer;
         if (!p) { console.error('No player available'); return; }

@@ -71,6 +71,7 @@
             PRAISE_LABELS['correct-letter'] = d.CORRECT_TEXTS || [];
             PRAISE_LABELS['name-complete'] = d.COMPLETE_TEXTS || [];
             PRAISE_LABELS['wrong-letter'] = d.WRONG_TEXTS || [];
+            PRAISE_LABELS['milestone-reward'] = d.MILESTONE_TEXTS || [];
         }).catch(() => {});
         const withImages = PLAYERS.filter(p => p.image);
         let currentAudio = null, playingBtn = null, activeRecorder = null, activeRecordBtn = null, previewAudio = null;
@@ -497,6 +498,7 @@
             'correct-letter': 'CORRECT_TEXTS',
             'name-complete': 'COMPLETE_TEXTS',
             'wrong-letter': 'WRONG_TEXTS',
+            'milestone-reward': 'MILESTONE_TEXTS',
         };
         function audioRowHTML(label, audioPath, uploadPath, opts) {
             opts=opts||{};
@@ -531,10 +533,67 @@
             c.insertAdjacentHTML('beforeend', audioRowHTML(`#${n}`,`audio/${PRAISE_FOLDER}/${folder}/${n}.mp3`,`${PRAISE_FOLDER}/${folder}/${n}.mp3`,{deletable:true, praiseArray:arrayName, praiseIdx:n-1}));
         }
 
+        // ===== Score Management =====
+        async function loadScore(apiBase, identity, el) {
+            try {
+                const url = identity
+                    ? `${apiBase}/state/load?identity=${encodeURIComponent(identity)}`
+                    : `${apiBase}/state/load`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                el.value = data.score || 0;
+                el.dataset.state = JSON.stringify(data);
+            } catch(e) { el.value = '?'; el.dataset.state = '{}'; }
+        }
+        async function saveScore(apiBase, identity, el) {
+            const btn = el.parentElement.querySelector('.score-save');
+            btn.textContent = '...';
+            const state = JSON.parse(el.dataset.state || '{}');
+            state.score = parseInt(el.value) || 0;
+            const body = identity
+                ? { identity, state }
+                : { state };
+            try {
+                const resp = await fetch(`${apiBase}/state/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const d = await resp.json();
+                btn.textContent = d.ok ? '✅' : '❌';
+            } catch(e) { btn.textContent = '❌'; }
+            setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+        }
+
         // ============================================================
         // BUILD SECTIONS
         // ============================================================
         const root = document.getElementById('app-content');
+
+        // 0. Score Management
+        const sScore = makeSection('s-scores', '🎯 Score Management', async el => {
+            const identities = [
+                { label: 'נרי (Neri)', api: '/neri/api', identity: 'neri' },
+                { label: 'עברי (Ivri)', api: '/neri/api', identity: 'ivri' },
+                { label: 'בומרים (Boomerim)', api: '/neri/api', identity: 'boomerim' },
+                { label: 'מעין (Maayan)', api: '/maayan/api', identity: '' },
+            ];
+            let h = '<table><thead><tr><th>Player</th><th>Score</th><th></th></tr></thead><tbody>';
+            identities.forEach((id, i) => {
+                h += `<tr>
+                    <td style="font-weight:700;direction:rtl">${id.label}</td>
+                    <td><input type="number" id="score-input-${i}" style="width:80px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:1rem;text-align:center" value="..."></td>
+                    <td><button class="score-save" onclick="saveScore('${id.api}','${id.identity}',document.getElementById('score-input-${i}'))" style="padding:5px 16px;border-radius:6px;border:1px solid #4CAF50;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-size:0.85rem;font-weight:700">Save</button></td>
+                </tr>`;
+            });
+            h += '</tbody></table>';
+            el.innerHTML = h;
+            // Load current scores
+            identities.forEach((id, i) => {
+                loadScore(id.api, id.identity, document.getElementById('score-input-' + i));
+            });
+        });
+        root.appendChild(sScore.header); root.appendChild(sScore.body);
 
         // 1. Title
         const s1=makeSection('s-title','🎵 Title',el=>{

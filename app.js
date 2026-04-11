@@ -116,6 +116,10 @@ const WRONG_AUDIO    = buildPraise('wrong-letter', 3);
 
 // Text shown on screen — matched to the personal recordings in each folder.
 // Index i corresponds to file (i+1).opus in the matching audio folder.
+const MILESTONE_TEXTS = [
+    '!כל הכבוד',          // 1.mp3
+    '!מדהים',             // 2.mp3
+];
 const CORRECT_TEXTS = [
     '!כל הכבוד',          // 1.opus
     '!יפה מאוד',          // 2.opus
@@ -697,6 +701,12 @@ class Game {
         this.stopAllAudio();
 
         this.currentPlayer = specificPlayer || this.pickNextPlayer();
+        // Track as recent to prevent immediate repeat (especially after restore)
+        if (specificPlayer) {
+            if (!this._recentIds) this._recentIds = [];
+            this._recentIds.push(specificPlayer.id);
+            if (this._recentIds.length > 5) this._recentIds.shift();
+        }
         this.currentFact = null;
         const p = this.currentPlayer;
         if (!p) { console.error('No player available'); return; }

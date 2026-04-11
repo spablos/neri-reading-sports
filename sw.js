@@ -1,5 +1,5 @@
 // Service Worker for נרי לומד לקרוא — caches all assets for offline play
-const CACHE_NAME = 'neri-v24';
+const CACHE_NAME = 'neri-v25';
 
 // Core app files
 const CORE_FILES = [
@@ -43,19 +43,16 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Audio files: cache-first (they never change)
+    // Audio files: network-first (may be re-recorded via back office), falls back to cache
     if (url.pathname.includes('/audio/')) {
         event.respondWith(
-            caches.match(event.request).then(cached => {
-                if (cached) return cached;
-                return fetch(event.request).then(response => {
-                    if (response.ok) {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                    }
-                    return response;
-                });
-            })
+            fetch(event.request).then(response => {
+                if (response.ok) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                }
+                return response;
+            }).catch(() => caches.match(event.request))
         );
         return;
     }
