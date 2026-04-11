@@ -53,6 +53,139 @@ body {
     position: relative;
 }
 
+/* ===== Soccer goals — 3D side-view ===== */
+.badge-goal {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 80px;
+    height: 200px;
+    z-index: 45;
+    pointer-events: none;
+}
+.badge-goal.goal-left { left: 0; }
+.badge-goal.goal-right { right: 0; }
+
+.goal-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Front frame — the opening you see */
+.goal-front-top, .goal-front-bottom {
+    position: absolute;
+    left: 0;
+    height: 8px;
+    background: linear-gradient(90deg, #ccc, #fff, #ccc);
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    z-index: 3;
+}
+.goal-front-top { top: 0; }
+.goal-front-bottom { bottom: 0; }
+.goal-left .goal-front-top, .goal-left .goal-front-bottom { left: 0; width: 80px; }
+.goal-right .goal-front-top, .goal-right .goal-front-bottom { right: 0; left: auto; width: 80px; }
+
+/* Vertical front post — the edge facing the viewer */
+.goal-front-post {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    background: linear-gradient(180deg, #ccc, #fff, #e0e0e0, #fff, #ccc);
+    border-radius: 4px;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.4);
+    z-index: 3;
+}
+.goal-left .goal-front-post { left: 0; }
+.goal-right .goal-front-post { right: 0; }
+
+/* Net — angled trapezoid going back into the screen */
+.goal-net-side {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    z-index: 1;
+    background:
+        repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.25) 10px, rgba(255,255,255,0.25) 12px),
+        repeating-linear-gradient(0deg, transparent, transparent 10px, rgba(255,255,255,0.25) 10px, rgba(255,255,255,0.25) 12px);
+    background-color: rgba(255,255,255,0.06);
+}
+/* Left goal: net extends to the left (behind the post) */
+.goal-left .goal-net-side {
+    left: 8px;
+    width: 70px;
+    transform: perspective(200px) rotateY(35deg);
+    transform-origin: left center;
+}
+/* Right goal: net extends to the right */
+.goal-right .goal-net-side {
+    right: 8px;
+    width: 70px;
+    transform: perspective(200px) rotateY(-35deg);
+    transform-origin: right center;
+}
+
+/* Net top and bottom panels (angled) */
+.goal-net-top, .goal-net-bottom {
+    position: absolute;
+    z-index: 2;
+    background:
+        repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 12px),
+        repeating-linear-gradient(0deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 12px);
+    background-color: rgba(255,255,255,0.04);
+}
+.goal-net-top { top: 0; height: 8px; }
+.goal-net-bottom { bottom: 0; height: 8px; }
+.goal-left .goal-net-top, .goal-left .goal-net-bottom {
+    left: 8px; width: 70px;
+    transform: perspective(200px) rotateY(35deg);
+    transform-origin: left center;
+}
+.goal-right .goal-net-top, .goal-right .goal-net-bottom {
+    right: 8px; width: 70px;
+    transform: perspective(200px) rotateY(-35deg);
+    transform-origin: right center;
+}
+
+/* Back post (far edge of net) */
+.goal-back-post {
+    position: absolute;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    background: rgba(200,200,200,0.4);
+    border-radius: 3px;
+    z-index: 0;
+}
+.goal-left .goal-back-post { left: 65px; }
+.goal-right .goal-back-post { right: 65px; }
+
+/* Goal glow on score */
+.badge-goal.goal-scored .goal-front-post,
+.badge-goal.goal-scored .goal-front-top,
+.badge-goal.goal-scored .goal-front-bottom {
+    background: linear-gradient(180deg, #FFD700, #FFF, #FFD700) !important;
+    box-shadow: 0 0 20px rgba(255,215,0,0.8) !important;
+}
+
+/* Score counters */
+.goal-score {
+    position: fixed;
+    top: 50%;
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: rgba(255,255,255,0.8);
+    z-index: 46;
+    pointer-events: none;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    text-align: center;
+    width: 80px;
+}
+.goal-score.score-left { left: 0; transform: translateY(-140px); }
+.goal-score.score-right { right: 0; transform: translateY(-140px); }
+
 #app {
     width: 100%;
     height: 100%;
@@ -95,6 +228,40 @@ body {
 @keyframes floatCloud {
     from { transform: translateX(-200px); }
     to { transform: translateX(calc(100vw + 200px)); }
+}
+
+/* ===== Floating sports decorations (real badge images) ===== */
+.sports-float {
+    position: fixed;
+    animation: floatSport linear infinite;
+    pointer-events: auto;
+    cursor: grab;
+    z-index: 50;
+}
+
+.sports-float.dragging-badge {
+    animation: none !important;
+    cursor: grabbing;
+    z-index: 200;
+    opacity: 0.9 !important;
+    transform: scale(1.2);
+    transition: transform 0.15s;
+}
+
+.sports-float.dropped-badge {
+    animation: none !important;
+}
+
+.sports-float img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+@keyframes floatSport {
+    from { transform: translateX(-120px); }
+    to { transform: translateX(calc(100vw + 120px)); }
 }
 
 /* ===== Title Bar ===== */
@@ -356,6 +523,23 @@ body {
     0%, 100% { transform: translateY(0) rotate(0deg); }
     25% { transform: translateY(-5px) rotate(-2deg); }
     75% { transform: translateY(3px) rotate(2deg); }
+}
+
+/* ===== Identity Badge (top-right) ===== */
+#identity-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 14px;
+    padding: 6px 14px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    z-index: 100;
+    font-family: var(--font-fun);
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1E3A8A;
+    border: 2px solid #75AADB;
 }
 
 /* ===== Score Panel ===== */
@@ -1005,12 +1189,55 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    /* Maccabi blue/gold + Argentina blue/white */
+    background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 30%, #75AADB 60%, #1E3A8A 100%);
+    background-size: 300% 300%;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     animation: startScreenBg 8s ease-in-out infinite alternate;
+    overflow: hidden;
+}
+
+/* Scattered badges on start screen */
+#start-screen::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    background:
+        url('img/maccabi-fc.png') 8% 20% / 100px no-repeat,
+        url('img/maccabi-fc.png') 85% 70% / 80px no-repeat,
+        url('img/maccabi-bc.png') 75% 15% / 90px no-repeat,
+        url('img/maccabi-bc.png') 15% 80% / 70px no-repeat,
+        url('img/argentina-afa.png') 90% 45% / 95px no-repeat,
+        url('img/argentina-afa.png') 5% 50% / 75px no-repeat,
+        url('img/argentina-flag.png') 40% 85% / 130px no-repeat,
+        url('img/argentina-flag.png') 55% 10% / 110px no-repeat;
+    opacity: 0.35;
+}
+
+/* Slow drift animation for start screen badges */
+#start-screen::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    background:
+        url('img/argentina-afa.png') 30% 30% / 70px no-repeat,
+        url('img/maccabi-fc.png') 60% 60% / 70px no-repeat,
+        url('img/argentina-flag.png') 20% 65% / 90px no-repeat,
+        url('img/maccabi-bc.png') 70% 35% / 65px no-repeat;
+    opacity: 0.25;
+    animation: floatPattern 25s ease-in-out infinite;
+}
+
+@keyframes floatPattern {
+    0% { transform: translate(0, 0); }
+    33% { transform: translate(-15px, 10px); }
+    66% { transform: translate(10px, -15px); }
+    100% { transform: translate(0, 0); }
 }
 
 @keyframes startScreenBg {
@@ -1046,6 +1273,45 @@ body {
 @keyframes soccerBounce {
     0%, 100% { transform: translateY(0) rotate(0deg); }
     50% { transform: translateY(-30px) rotate(180deg); }
+}
+
+#identity-buttons {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.identity-btn {
+    font-family: var(--font-display);
+    font-size: clamp(1.2rem, 4vw, 2rem);
+    padding: 14px 32px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.25), rgba(255,255,255,0.1));
+    color: #fff;
+    border: 3px solid rgba(255,255,255,0.4);
+    border-radius: 18px;
+    cursor: pointer;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.identity-btn:hover, .identity-btn:active {
+    transform: scale(1.08);
+    box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+    background: linear-gradient(145deg, rgba(255,255,255,0.4), rgba(255,255,255,0.2));
+}
+
+.identity-btn.identity-main {
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    padding: 18px 44px;
+    background: linear-gradient(145deg, #4CAF50, #2E7D32);
+    border-color: rgba(255,255,255,0.6);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
+.identity-btn.identity-main:hover, .identity-btn.identity-main:active {
+    background: linear-gradient(145deg, #66BB6A, #388E3C);
 }
 
 #start-btn {
@@ -1097,6 +1363,15 @@ body {
         min-width: 56px;
         border-radius: 14px;
         border-width: 2px;
+    }
+
+    #identity-badge {
+        top: auto;
+        bottom: 8px;
+        right: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        border-radius: 12px;
     }
 
     #score-label { font-size: 0.6rem; }

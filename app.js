@@ -188,36 +188,25 @@ class Game {
         this.isAnimating = false;
         this.audioPlayer = null;
 
-        // Persistent score — load from localStorage
-        const saved = JSON.parse(localStorage.getItem('neri-game-state') || '{}');
-        this.score = saved.score || 0;
-        this.milestoneCount = saved.milestoneCount || 0;
-        this.totalCompleted = saved.totalCompleted || 0; // total names completed (for unlock)
-        this.funFactsUnlocked = saved.funFactsUnlocked || false;
+        // Identity — set when user picks on start screen
+        this.identity = null;
 
-        // ---- Level progression & repetition ----
-        // Only keep players that have an image
+        // Game state defaults — loaded from server after identity selection
+        this.score = 0;
+        this.milestoneCount = 0;
+        this.totalCompleted = 0;
+        this.funFactsUnlocked = false;
+
+        // ---- Player pool — fully random from all players with images ----
         const withImages = PLAYERS.filter(p => p.image);
-        // Count actual letters (exclude space tokens) for difficulty
         withImages.forEach(p => {
             p._tokenCount = HEBREW.tokenize(p.name).filter(t => t !== ' ').length;
         });
-        // Weight: fewer NBA players, more soccer + Israeli + Maccabi basketball
-        // Keep only top ~12 NBA stars (IDs 1-12), all soccer, all Israeli
-        const topNBA = new Set([1,2,3,4,5,6,7,8,12,19,20,22]); // LeBron,Curry,Durant,Giannis,Luka,Jokic,Embiid,Tatum,Booker,Shai,Zion,Wemby
-        const filtered = withImages.filter(p => {
-            if (p.id >= 1 && p.id <= 35 && !topNBA.has(p.id)) return false; // skip non-top NBA
-            return true;
-        });
-        // Bucket by difficulty
-        this.easyPool   = shuffle(filtered.filter(p => p._tokenCount <= 7));
-        this.mediumPool = shuffle(filtered.filter(p => p._tokenCount >= 8 && p._tokenCount <= 10));
-        this.hardPool   = shuffle(filtered.filter(p => p._tokenCount >= 11));
-        this.mastered   = [];        // players the kid already completed
-        this.roundCount = 0;         // how many players shown so far
-        this.easyIdx = 0;
-        this.mediumIdx = 0;
-        this.hardIdx = 0;
+        // Single shuffled pool — all players mixed together for maximum randomness
+        this.allPool = shuffle([...withImages]);
+        this.poolIdx = 0;
+        this.mastered = [];
+        this.roundCount = 0;
 
         // Fun facts pool
         this.funFactsPool = typeof FUN_FACTS !== 'undefined' ? shuffle([...FUN_FACTS]) : [];
@@ -260,9 +249,10 @@ class Game {
         };
     }
 
-    // Persist game state to localStorage
+    // Persist game state to localStorage + server
     saveState() {
-        localStorage.setItem('neri-game-state', JSON.stringify({
+        if (!this.identity) return;
+        const state = {
             score: this.score,
             milestoneCount: this.milestoneCount,
             totalCompleted: this.totalCompleted,
@@ -271,42 +261,47 @@ class Game {
             currentPlayerId: this.currentPlayer ? this.currentPlayer.id : null,
             currentFactIdx: this.currentFact ? this.currentFact._origIdx : null,
             lastActiveTime: Date.now(),
-        }));
+        };
+        localStorage.setItem('neri-game-state-' + this.identity, JSON.stringify(state));
+        this.syncToServer(state);
     }
 
-    // Pick next player based on progressive difficulty + repetition
+    // Debounced server sync
+    syncToServer(state) {
+        clearTimeout(this._syncTimer);
+        this._syncTimer = setTimeout(() => {
+            fetch('/neri/api/state/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identity: this.identity, state }),
+            }).catch(() => {});
+        }, 2000);
+    }
+
+    // Pick next player — random from shuffled pool, no repeat within last 5
     pickNextPlayer() {
         this.roundCount++;
-        // Every 4th round, repeat a mastered player for reinforcement
-        if (this.mastered.length >= 2 && this.roundCount % 4 === 0) {
-            return this.mastered[Math.floor(Math.random() * this.mastered.length)];
-        }
-        // Progression schedule:
-        //   rounds 1-6:  easy only (2-3 tokens)
-        //   rounds 7-14: mostly easy, some medium
-        //   rounds 15+:  mix of all, weighted toward easier
-        const r = this.roundCount;
-        let pool, idx;
-        const roll = Math.random();
-        if (r <= 6) {
-            pool = 'easy';
-        } else if (r <= 14) {
-            pool = roll < 0.65 ? 'easy' : 'medium';
-        } else {
-            pool = roll < 0.40 ? 'easy' : roll < 0.75 ? 'medium' : 'hard';
-        }
-        // Try to pick from chosen pool; fall back to others if exhausted
-        const pick = (arr, idxName) => {
-            if (this[idxName] >= arr.length) { this[idxName] = 0; arr = shuffle(arr); }
-            return arr[this[idxName]++];
+        if (!this._recentIds) this._recentIds = [];
+
+        const isRecent = (p) => this._recentIds.includes(p.id);
+        const track = (p) => {
+            this._recentIds.push(p.id);
+            if (this._recentIds.length > 5) this._recentIds.shift();
+            return p;
         };
-        if (pool === 'easy'   && this.easyPool.length)   return pick(this.easyPool, 'easyIdx');
-        if (pool === 'medium' && this.mediumPool.length)  return pick(this.mediumPool, 'mediumIdx');
-        if (pool === 'hard'   && this.hardPool.length)    return pick(this.hardPool, 'hardIdx');
-        // fallback
-        if (this.easyPool.length) return pick(this.easyPool, 'easyIdx');
-        if (this.mediumPool.length) return pick(this.mediumPool, 'mediumIdx');
-        return pick(this.hardPool, 'hardIdx');
+
+        // Walk through shuffled pool, skip recently shown
+        for (let attempt = 0; attempt < this.allPool.length; attempt++) {
+            if (this.poolIdx >= this.allPool.length) {
+                // Reshuffle when we've gone through all players
+                this.allPool = shuffle([...this.allPool]);
+                this.poolIdx = 0;
+            }
+            const p = this.allPool[this.poolIdx++];
+            if (!isRecent(p)) return track(p);
+        }
+        // All recent — just pick random
+        return track(this.allPool[Math.floor(Math.random() * this.allPool.length)]);
     }
 
     init() {
@@ -375,7 +370,7 @@ class Game {
         // On first load after refresh, try to restore saved context
         if (this._restoreOnce === undefined) {
             this._restoreOnce = true;
-            const saved = JSON.parse(localStorage.getItem('neri-game-state') || '{}');
+            const saved = JSON.parse(localStorage.getItem('neri-game-state-' + this.identity) || '{}');
             if (saved.currentMode) {
                 this.mode = saved.currentMode;
                 // Update tab UI
@@ -415,7 +410,10 @@ class Game {
         el.style.cursor = 'pointer';
         el.addEventListener('click', () => {
             this.stopAllAudio();
-            Speech.speakWord(text);
+            if (this.audioPlayer) {
+                this.audioPlayer.src = 'audio/title.mp3?t=' + Date.now();
+                this.audioPlayer.play().catch(() => {});
+            }
         });
         el.innerHTML = '';
         for (const ch of text) {
@@ -435,32 +433,104 @@ class Game {
     // ===== Start screen =====
     buildStartScreen() {
         this.dom.startTitle.textContent = '⚽ נרי לומד לקרוא ⚽';
+        this.dom.startTitle.style.cursor = 'pointer';
+        // Play title audio
+        const playTitle = () => {
+            const a = new Audio('audio/title.mp3?t=' + Date.now());
+            a.play().catch(() => {});
+        };
+        // Click on title replays it
+        this.dom.startTitle.addEventListener('click', playTitle);
+        // Try auto-play on load (may be blocked by browser — that's OK, user can tap title)
+        setTimeout(() => {
+            const a = new Audio('audio/title.mp3?t=' + Date.now());
+            a.play().catch(() => {}); // silently fail if blocked
+        }, 500);
 
-        this.dom.startBtn.addEventListener('click', () => {
-            try { SFX._getCtx(); } catch(e) {}
-            this.audioPlayer = new Audio();
-            this.audioPlayer.volume = 1.0;
-            this.audioPlayer.playbackRate = 1.2;
-            this.audioPlayer.src = CORRECT_AUDIO[0];
-            this.audioPlayer.play().then(() => {
-                this.audioPlayer.pause();
-                this.audioPlayer.currentTime = 0;
-            }).catch(() => {});
-            this.dom.startScreen.classList.add('hidden');
-            this.isAnimating = false;
-            this.loadNext();
+        // Identity buttons
+        document.querySelectorAll('.identity-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectIdentity(btn.dataset.identity);
+            });
         });
-
-        // If returning from a recent refresh, show a quick-resume message
-        const saved = JSON.parse(localStorage.getItem('neri-game-state') || '{}');
-        const secondsSinceActive = (Date.now() - (saved.lastActiveTime || 0)) / 1000;
-        if ((saved.currentPlayerId || saved.currentFactIdx) && secondsSinceActive < 60) {
-            this.dom.startBtn.textContent = '▶ המשך לשחק';
-        }
     }
 
-    // ===== Background clouds =====
+    async selectIdentity(identity) {
+        this.identity = identity;
+
+        // Show identity badge
+        const idNames = { neri: 'נרי', ivri: 'עברי', boomerim: 'בומרים' };
+        const badge = document.getElementById('identity-badge');
+        badge.textContent = idNames[identity] || identity;
+        badge.classList.remove('hidden');
+
+        // Initialize audio context
+        try { SFX._getCtx(); } catch(e) {}
+        this.audioPlayer = new Audio();
+        this.audioPlayer.volume = 1.0;
+        this.audioPlayer.playbackRate = 1.2;
+        this.audioPlayer.src = CORRECT_AUDIO[0];
+        this.audioPlayer.play().then(() => {
+            this.audioPlayer.pause();
+            this.audioPlayer.currentTime = 0;
+        }).catch(() => {});
+
+        // Load state from server, fallback to localStorage
+        await this.loadIdentityState();
+
+        // Update displayed score and UI
+        this.dom.scoreValue.textContent = this.score;
+        if (this.funFactsUnlocked) {
+            this.dom.modeTabs.classList.remove('hidden');
+        }
+
+        // Start activity tracking with identity
+        if (window._startTracking) window._startTracking(identity);
+
+        // Hide start screen and begin
+        this.dom.startScreen.classList.add('hidden');
+        this.isAnimating = false;
+        this.loadNext();
+    }
+
+    async loadIdentityState() {
+        const localKey = 'neri-game-state-' + this.identity;
+
+        // Migrate old state for Neri (one-time)
+        if (!localStorage.getItem(localKey) && localStorage.getItem('neri-game-state')) {
+            if (this.identity === 'neri') {
+                localStorage.setItem(localKey, localStorage.getItem('neri-game-state'));
+            }
+        }
+
+        // Try server first
+        try {
+            const resp = await fetch('/neri/api/state/load?identity=' + encodeURIComponent(this.identity));
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.score !== undefined) {
+                    this.applyState(data);
+                    localStorage.setItem(localKey, JSON.stringify(data));
+                    return;
+                }
+            }
+        } catch(_) {}
+
+        // Fallback to localStorage
+        const saved = JSON.parse(localStorage.getItem(localKey) || '{}');
+        this.applyState(saved);
+    }
+
+    applyState(saved) {
+        this.score = saved.score || 0;
+        this.milestoneCount = saved.milestoneCount || 0;
+        this.totalCompleted = saved.totalCompleted || 0;
+        this.funFactsUnlocked = saved.funFactsUnlocked || false;
+    }
+
+    // ===== Background clouds + sports decorations =====
     createClouds() {
+        // Clouds
         for (let i = 0; i < 5; i++) {
             const cloud = document.createElement('div');
             cloud.className = 'cloud';
@@ -471,6 +541,154 @@ class Game {
             cloud.style.animationDuration = randomBetween(30, 60) + 's';
             cloud.style.animationDelay = -randomBetween(0, 30) + 's';
             this.dom.floatingDeco.appendChild(cloud);
+        }
+
+        // Floating + static sports badges — all draggable
+        const badgeSrcs = ['img/maccabi-fc.png','img/argentina-afa.png','img/maccabi-bc.png','img/argentina-flag.png'];
+        const badges = [];
+        // Create 24 badges spread across the screen
+        for (let i = 0; i < 24; i++) {
+            const src = badgeSrcs[i % badgeSrcs.length];
+            const size = randomBetween(35, 70);
+            const el = document.createElement('div');
+            el.className = 'sports-float';
+            el.style.width = size + 'px';
+            el.style.height = size + 'px';
+            el.style.opacity = randomBetween(0.2, 0.4);
+            if (i < 16) {
+                el.style.top = randomBetween(5, 90) + '%';
+                el.style.animationDuration = randomBetween(35, 75) + 's';
+                el.style.animationDelay = -randomBetween(0, 40) + 's';
+            } else {
+                el.classList.add('dropped-badge');
+                el.style.top = randomBetween(8, 88) + '%';
+                el.style.left = randomBetween(5, 95) + '%';
+            }
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = '';
+            el.appendChild(img);
+            document.body.appendChild(el);
+            this.makeBadgeDraggable(el);
+        }
+
+        // Two 3D goals on left and right edges, vertically centered
+        this.goalScores = { left: 0, right: 0 };
+        ['left', 'right'].forEach(side => {
+            const goal = document.createElement('div');
+            goal.className = 'badge-goal goal-' + side;
+            goal.dataset.side = side;
+            goal.innerHTML = '<div class="goal-inner"><div class="goal-front-post"></div><div class="goal-front-top"></div><div class="goal-front-bottom"></div><div class="goal-net-side"></div><div class="goal-net-top"></div><div class="goal-net-bottom"></div><div class="goal-back-post"></div></div>';
+            document.body.appendChild(goal);
+            const score = document.createElement('div');
+            score.className = 'goal-score score-' + side;
+            score.id = 'goal-score-' + side;
+            document.body.appendChild(score);
+        });
+    }
+
+    makeDraggable(el) {
+        let dragOff = null;
+        let startPos = null;
+        let moved = false;
+        const getPos = (e) => e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+        const onStart = (e) => {
+            // Don't interfere with game token drag (tokens have .token class)
+            if (e.target.closest('.token')) return;
+            const pos = getPos(e);
+            const rect = el.getBoundingClientRect();
+            dragOff = { x: pos.x - rect.left, y: pos.y - rect.top };
+            startPos = { x: pos.x, y: pos.y };
+            moved = false;
+        };
+        const onMove = (e) => {
+            if (!dragOff) return;
+            const pos = getPos(e);
+            // Only start dragging after moving 5px (so clicks still work)
+            if (!moved && Math.abs(pos.x - startPos.x) < 5 && Math.abs(pos.y - startPos.y) < 5) return;
+            if (!moved) {
+                moved = true;
+                el.classList.add('dragging-badge');
+                el.style.position = 'fixed';
+                el.style.left = (startPos.x - dragOff.x) + 'px';
+                el.style.top = (startPos.y - dragOff.y) + 'px';
+                el.style.zIndex = '200';
+            }
+            e.preventDefault();
+            el.style.left = (pos.x - dragOff.x) + 'px';
+            el.style.top = (pos.y - dragOff.y) + 'px';
+        };
+        const onEnd = () => {
+            if (!dragOff) return;
+            const wasMoved = moved;
+            dragOff = null;
+            startPos = null;
+            el.classList.remove('dragging-badge');
+            if (wasMoved) {
+                el.classList.add('dropped-badge');
+                // Check if dropped in the goal
+                this.checkGoal(el);
+            }
+            moved = false;
+        };
+        el.addEventListener('mousedown', onStart);
+        el.addEventListener('touchstart', onStart, { passive: true });
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchend', onEnd);
+    }
+
+    makeBadgeDraggable(el) { this.makeDraggable(el); }
+
+    checkGoal(el) {
+        const goals = document.querySelectorAll('.badge-goal');
+        const er = el.getBoundingClientRect();
+        const cx = er.left + er.width / 2;
+        const cy = er.top + er.height / 2;
+        for (const goal of goals) {
+            const gr = goal.getBoundingClientRect();
+            if (cx >= gr.left && cx <= gr.right && cy >= gr.top && cy <= gr.bottom) {
+                // GOAL!
+                const side = goal.dataset.side;
+                if (!this.goalScores) this.goalScores = { left: 0, right: 0 };
+                this.goalScores[side]++;
+                const scoreEl = document.getElementById('goal-score-' + side);
+                if (scoreEl) {
+                    scoreEl.textContent = '⚽ ' + this.goalScores[side];
+                    scoreEl.style.transform = 'scale(1.5)';
+                    setTimeout(() => { scoreEl.style.transform = 'scale(1)'; }, 300);
+                }
+                // Celebration + add to main score
+                SFX.correctDing();
+                this.score++;
+                this.updateScore();
+                // Bonus if all badges scored
+                const total = (this.goalScores.left||0) + (this.goalScores.right||0);
+                if (total > 0 && total % 24 === 0) {
+                    this.score += 10;
+                    this.updateScore();
+                    this.showConfetti();
+                    this.showBalloons();
+                }
+                // Badge disappears into the goal
+                el.style.transition = 'transform 0.3s, opacity 0.3s';
+                el.style.transform = 'scale(0)';
+                el.style.opacity = '0';
+                // Respawn
+                setTimeout(() => {
+                    el.style.transition = 'none';
+                    el.style.transform = 'scale(1)';
+                    el.style.opacity = randomBetween(0.2, 0.4);
+                    el.style.top = randomBetween(5, 40) + '%';
+                    el.style.left = randomBetween(15, 85) + '%';
+                    el.classList.add('dropped-badge');
+                }, 800);
+                // Flash the goal gold
+                goal.classList.add('goal-scored');
+                setTimeout(() => goal.classList.remove('goal-scored'), 600);
+                return;
+            }
         }
     }
 
@@ -600,8 +818,10 @@ class Game {
         // Skip
         this.dom.skipBtn.onclick = () => this.skipCurrent();
 
-        // Speak the name once after a short delay
-        setTimeout(speakName, 600);
+        // Play the name audio once after a short delay
+        setTimeout(() => {
+            this.playAudioWithFallback(`audio/names/${p.id}.mp3`, p.name, null);
+        }, 600);
 
         // Save state so refresh returns to this player
         this.saveState();
@@ -722,7 +942,7 @@ class Game {
         matchingToken.element.classList.add('placed');
         // Play its sound
         this.stopAllAudio();
-        Speech.speakTokenSound(matchingToken.sound);
+        this.playTokenSound(matchingToken.sound);
         // Don't increment score for hints
         // Check if name complete
         if (this.dropZones.every(dz => dz.filled)) {
@@ -832,7 +1052,7 @@ class Game {
             // Play the token's sound
             try {
                 this.stopAllAudio();
-                if (tokenData.sound) Speech.speakTokenSound(tokenData.sound);
+                if (tokenData.sound) this.playTokenSound(tokenData.sound);
             } catch(_) {}
             // Start drag
             const rect = tokenData.element.getBoundingClientRect();
@@ -887,9 +1107,8 @@ class Game {
         const dz = this.getDropZoneAt(pos);
         if (dz && !dz.filled) {
             this.tryPlaceToken(tok, dz);
-        } else {
-            this.returnTokenToOrigin(tok);
         }
+        // If not on a drop zone, leave the token where it was dropped (free drag)
 
         // Clean up highlights
         this.dropZones.forEach(dz => dz.element.classList.remove('highlight'));
@@ -953,7 +1172,7 @@ class Game {
         dropZone.element.classList.add('wrong');
         setTimeout(() => dropZone.element.classList.remove('wrong'), 500);
         this.showFeedback('wrong');
-        this.returnTokenToOrigin(tokenData);
+        // Leave token where it was dropped (free drag)
     }
 
     returnTokenToOrigin(tokenData) {
@@ -978,7 +1197,7 @@ class Game {
         this.saveState();
 
         // Unlock fun facts at 100 points
-        if (!this.funFactsUnlocked && this.score >= 100) {
+        if (!this.funFactsUnlocked && this.score >= 300) {
             this.funFactsUnlocked = true;
             this.saveState();
             this.dom.modeTabs.classList.remove('hidden');
@@ -988,13 +1207,15 @@ class Game {
         // and only play the bigger milestone audio (no duplicates)
         const milestoneHit = this.score > 0 && this.score % 10 === 0;
 
+        let audioDone;
         if (milestoneHit) {
-            // Milestone is the "greater blessing" — only play that
+            // Milestone is the "greater blessing" — only show text now, audio plays later
             this.showCelebration(COMPLETE_TEXTS[Math.floor(Math.random() * COMPLETE_TEXTS.length)]);
         } else {
             // Normal name complete — play name-complete praise
-            const celebText = this.playPraiseAndGetText(COMPLETE_AUDIO, COMPLETE_TEXTS);
-            this.showCelebration(celebText);
+            const result = this.playPraiseAndGetText(COMPLETE_AUDIO, COMPLETE_TEXTS);
+            this.showCelebration(result.text);
+            audioDone = result.audioDone;
         }
 
         this.showConfetti();
@@ -1003,8 +1224,7 @@ class Game {
         // Glow the drop zones
         this.dropZones.forEach(dz => dz.element.classList.add('glow-pulse'));
 
-        // Wait for audio to finish, then proceed.
-        // Use a guard flag to prevent duplicate calls.
+        // Wait for audio to fully finish, then proceed.
         let proceeded = false;
         const goNext = () => {
             if (proceeded) return;
@@ -1014,12 +1234,20 @@ class Game {
         };
 
         if (milestoneHit) {
-            // Show milestone after a delay, then move on
-            setTimeout(() => this.showMilestone(), 2500);
-            setTimeout(goNext, 6000);
+            // Wait for name-complete celebration (1.5s), then play milestone audio and wait for it
+            setTimeout(async () => {
+                const milestoneAudioDone = this.showMilestone();
+                await milestoneAudioDone;
+                // Brief pause after milestone audio ends
+                setTimeout(goNext, 800);
+            }, 1500);
         } else {
-            // Normal name complete — wait a reasonable time then move on
-            setTimeout(goNext, 3500);
+            // Wait for name-complete audio to finish, then move on
+            if (audioDone) {
+                audioDone.then(() => setTimeout(goNext, 600));
+            }
+            // Safety fallback in case audio never fires ended (e.g. load failure)
+            setTimeout(goNext, 10000);
         }
     }
 
@@ -1032,12 +1260,24 @@ class Game {
         this.saveState();
     }
 
-    // Pick a random index and play matching audio + return matching text
+    // Pick a random index and play matching audio + return { text, audioDone }
+    // Pick random praise, avoiding the last 2 used per category
+    _praiseHistory = {};
     playPraiseAndGetText(audioArr, textArr) {
         this.stopAllAudio();
-        const idx = Math.floor(Math.random() * Math.min(audioArr.length, textArr.length));
-        this.playAudioFile(audioArr[idx]);
-        return textArr[idx];
+        const key = audioArr[0] || '';
+        if (!this._praiseHistory[key]) this._praiseHistory[key] = [];
+        const history = this._praiseHistory[key];
+        const len = Math.min(audioArr.length, textArr.length);
+        let idx;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            idx = Math.floor(Math.random() * len);
+            if (!history.includes(idx) || len <= 2) break;
+        }
+        history.push(idx);
+        if (history.length > 2) history.shift();
+        const audioDone = this.playAudioFile(audioArr[idx]);
+        return { text: textArr[idx], audioDone };
     }
 
     // Track which button triggered current audio (for toggle behavior)
@@ -1061,13 +1301,30 @@ class Game {
     }
 
     // Central method: play any MP3 file (no toggle tracking)
+    // Returns a Promise that resolves when audio finishes playing.
+    // Play token/syllable sound — MP3 file first, TTS fallback
+    playTokenSound(sound) {
+        if (!sound) return;
+        const src = 'audio/tokens/' + encodeURIComponent(sound) + '.mp3';
+        if (this.audioPlayer) {
+            this.stopAllAudio();
+            this.audioPlayer.src = src;
+            this.audioPlayer.onerror = () => Speech.speakTokenSound(sound);
+            this.audioPlayer.play().catch(() => Speech.speakTokenSound(sound));
+        } else {
+            Speech.speakTokenSound(sound);
+        }
+    }
+
     playAudioFile(src) {
-        if (!this.audioPlayer) return;
+        if (!this.audioPlayer) return Promise.resolve();
         this.stopAllAudio();
         this.audioPlayer.src = src;
-        this.audioPlayer.onended = null;
-        this.audioPlayer.onerror = null;
-        this.audioPlayer.play().catch(() => {});
+        return new Promise(resolve => {
+            this.audioPlayer.onended = resolve;
+            this.audioPlayer.onerror = resolve;
+            this.audioPlayer.play().catch(resolve);
+        });
     }
 
     // Play pre-generated MP3 with fallback to browser TTS (toggle-aware)
@@ -1089,7 +1346,7 @@ class Game {
     showFeedback(type) {
         const audioArr = type === 'correct' ? CORRECT_AUDIO : WRONG_AUDIO;
         const textArr  = type === 'correct' ? CORRECT_TEXTS  : WRONG_TEXTS;
-        const text = this.playPraiseAndGetText(audioArr, textArr);
+        const { text } = this.playPraiseAndGetText(audioArr, textArr);
         const el = this.dom.feedbackOverlay;
         const content = this.dom.feedbackContent;
         content.textContent = text;
@@ -1176,9 +1433,9 @@ class Game {
         const m = MILESTONES[idx];
         this.milestoneCount++;
 
-        // Play personal milestone praise
+        // Play personal milestone praise — return promise
         this.stopAllAudio();
-        this.playAudioFile(pickRandom(MILESTONE_AUDIO));
+        const audioDone = this.playAudioFile(pickRandom(MILESTONE_AUDIO));
 
         const el = this.dom.milestoneOverlay;
         const content = this.dom.milestoneContent;
@@ -1198,7 +1455,14 @@ class Game {
         // Fireworks
         this.showFireworks();
 
-        setTimeout(() => el.classList.add('hidden'), 2800);
+        // Hide overlay after audio finishes (not before)
+        audioDone.then(() => {
+            setTimeout(() => el.classList.add('hidden'), 500);
+        });
+        // Safety fallback
+        setTimeout(() => el.classList.add('hidden'), 10000);
+
+        return audioDone;
     }
 
     // ===== Fireworks =====

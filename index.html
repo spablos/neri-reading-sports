@@ -30,6 +30,9 @@
             </div>
         </header>
 
+        <!-- Identity badge (top-right) -->
+        <div id="identity-badge" class="hidden"></div>
+
         <!-- Score Panel -->
         <div id="score-panel">
             <div id="score-label">ניקוד</div>
@@ -109,7 +112,11 @@
             <div id="start-content">
                 <h1 id="start-title"></h1>
                 <div id="start-soccer">⚽</div>
-                <button id="start-btn">בואו נתחיל!</button>
+                <div id="identity-buttons">
+                    <button class="identity-btn" data-identity="ivri">עברי</button>
+                    <button class="identity-btn identity-main" data-identity="neri">נרי</button>
+                    <button class="identity-btn" data-identity="boomerim">בומרים</button>
+                </div>
             </div>
             <!-- Refresh button also on start screen -->
             <div id="version-bar-start">
@@ -145,6 +152,80 @@
         }
         checkForUpdate();
         setInterval(checkForUpdate, 60 * 1000);
+
+        // ===== Client Activity Tracker (deferred until identity selected) =====
+        window._startTracking = function(identity) {
+            // Persistent device ID via localStorage (survives sessions)
+            let deviceId = localStorage.getItem('neri-device-id');
+            if (!deviceId) {
+                deviceId = 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+                localStorage.setItem('neri-device-id', deviceId);
+            }
+            const ua = navigator.userAgent;
+            const info = {
+                event: 'session',
+                identity: identity,
+                deviceId: deviceId,
+                userAgent: ua,
+                platform: navigator.platform || '',
+                language: navigator.language || '',
+                screenW: screen.width,
+                screenH: screen.height,
+                viewportW: window.innerWidth,
+                viewportH: window.innerHeight,
+                pixelRatio: window.devicePixelRatio || 1,
+                touchSupport: 'ontouchstart' in window,
+                online: navigator.onLine,
+                referrer: document.referrer || '',
+                url: location.href,
+                localTime: new Date().toISOString(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+            };
+            // Detect device type
+            if (/iPhone|iPad|iPod/.test(ua)) info.device = 'iOS';
+            else if (/Android/.test(ua)) info.device = 'Android';
+            else if (/Mac/.test(ua)) info.device = 'Mac';
+            else if (/Windows/.test(ua)) info.device = 'Windows';
+            else if (/Linux/.test(ua)) info.device = 'Linux';
+            else info.device = 'Unknown';
+            // Detect browser
+            if (/CriOS/.test(ua)) info.browser = 'Chrome iOS';
+            else if (/Chrome/.test(ua) && !/Edge/.test(ua)) info.browser = 'Chrome';
+            else if (/Safari/.test(ua) && !/Chrome/.test(ua)) info.browser = 'Safari';
+            else if (/Firefox/.test(ua)) info.browser = 'Firefox';
+            else if (/Edg/.test(ua)) info.browser = 'Edge';
+            else info.browser = 'Other';
+            // Try to get the real public IP from client side
+            const sessionStart = Date.now();
+            const sendTrack = (publicIp) => {
+                if (publicIp) info.publicIp = publicIp;
+                fetch('/neri/api/track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(info),
+                }).then(r => r.json()).then(d => {
+                // Send heartbeats every 30s to track usage duration
+                const sessionId = info.sessionId || (info.ip + '-' + sessionStart);
+                // Build session ID on client to match server
+                const sendHeartbeat = () => {
+                    const elapsed = Math.round((Date.now() - sessionStart) / 1000);
+                    fetch('/neri/api/heartbeat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: d.sessionId || sessionId, elapsed }),
+                    }).catch(() => {});
+                };
+                setInterval(sendHeartbeat, 30000);
+                // Also send on page unload
+                window.addEventListener('beforeunload', sendHeartbeat);
+            }).catch(() => {});
+            };
+            // Fetch public IP from free API, then send tracking
+            fetch('https://api.ipify.org?format=json')
+                .then(r => r.json())
+                .then(d => sendTrack(d.ip))
+                .catch(() => sendTrack(null));
+        };
 
         // Refresh: save state, clear caches, reload
         async function hardRefresh() {

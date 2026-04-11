@@ -1,5 +1,5 @@
 // Service Worker for נרי לומד לקרוא — caches all assets for offline play
-const CACHE_NAME = 'neri-v18';
+const CACHE_NAME = 'neri-v24';
 
 // Core app files
 const CORE_FILES = [
@@ -37,8 +37,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
-    // version.json: always network (never cache)
-    if (url.pathname.endsWith('version.json')) {
+    // API calls and version.json: always network (never cache)
+    if (url.pathname.includes('/api/') || url.pathname.endsWith('version.json')) {
         event.respondWith(fetch(event.request));
         return;
     }

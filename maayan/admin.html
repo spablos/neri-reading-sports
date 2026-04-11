@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — מעין לומד לקרוא</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&family=Noto+Sans+Hebrew:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Rubik', sans-serif; background: #f5f5f5; padding: 20px; direction: rtl; }
+        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        th { background: #333; color: #fff; padding: 10px 8px; text-align: right; font-size: 0.85rem; }
+        td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle; font-size: 0.85rem; }
+        tr:hover { background: #f0f8ff; }
+        .name-nikud { font-family: 'Noto Sans Hebrew', sans-serif; font-size: 1.1rem; font-weight: 700; }
+        .btn { border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 0.85rem; cursor: pointer; color: #fff; vertical-align: middle; }
+        .btn:hover { opacity: 0.85; }
+        .btn-play { background: #4CAF50; }
+        .btn-play.playing { background: #FF5722; }
+        .btn-rec { background: #d32f2f; }
+        .btn-del { background: #888; }
+        .btn-claude { background: #9C27B0; }
+        .btn-text { background: #795548; }
+        .btn-tok { background: #FF9800; }
+        .token-preview { font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.8rem; color: #666; direction: rtl; }
+        .img-thumb { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .editable { cursor: pointer; border-bottom: 1px dashed #999; padding-bottom: 2px; }
+        .editable:hover { background: #E3F2FD; border-bottom-color: #1976D2; }
+        .section-header { background: #333; color: #fff; padding: 14px 20px; border-radius: 12px; margin: 25px 0 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; font-weight: 700; }
+        .section-header:hover { background: #444; }
+        .section-header .arrow { transition: transform 0.2s; }
+        .section-header.open .arrow { transform: rotate(90deg); }
+        .section-body { display: none; }
+        .section-body.open { display: block; }
+        .ab { display: inline-flex; gap: 3px; align-items: center; }
+        .add-form { background: #fff; border: 2px solid #4CAF50; border-radius: 12px; padding: 16px; margin: 12px 0; display: none; }
+        .add-form label { display: block; margin: 8px 0 2px; font-weight: 700; font-size: 0.85rem; color: #555; }
+        .add-form input, .add-form select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: 'Noto Sans Hebrew', sans-serif; }
+        .add-form .required::after { content: ' *'; color: #d32f2f; }
+        .add-form .form-actions { margin-top: 14px; display: flex; gap: 8px; }
+        .add-form .form-actions button { padding: 8px 24px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 700; }
+        .toolbar { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+        .toolbar button { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; border: 2px solid; }
+    </style>
+</head>
+<body>
+    <h1>Back Office — מעין לומד לקרוא</h1>
+    <div id="app-content"></div>
+
+    <script>
+    // Cache-bust: load data files with timestamp to always get fresh data
+    const _t = Date.now();
+    ['players.js','descriptions.js','funfacts.js','hebrew.js'].forEach(f => {
+        document.write('<scr'+'ipt src="'+f+'?t='+_t+'"></scr'+'ipt>');
+    });
+    </script>
+    <script>
+        const API_BASE = '/maayan/api';
+        const PRAISE_FOLDER = 'neri-praise';
+        const APP_TITLE = 'מעין לומד לקרוא';
+        // Praise labels loaded from server (from app.js)
+        let PRAISE_LABELS = {
+            'correct-letter': [],
+            'name-complete': [],
+            'wrong-letter': [],
+            'milestone-reward': [],
+        };
+        // Fetch live praise texts from app.js on server
+        fetch(`${API_BASE}/praise/texts`).then(r=>r.json()).then(d => {
+            PRAISE_LABELS['correct-letter'] = d.CORRECT_TEXTS || [];
+            PRAISE_LABELS['name-complete'] = d.COMPLETE_TEXTS || [];
+            PRAISE_LABELS['wrong-letter'] = d.WRONG_TEXTS || [];
+        }).catch(() => {});
+        const withImages = PLAYERS.filter(p => p.image);
+        let currentAudio = null, playingBtn = null, activeRecorder = null, activeRecordBtn = null, previewAudio = null;
+
+        // ===== Audio =====
+        function stopAudio() {
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+            if (window.speechSynthesis) speechSynthesis.cancel();
+            if (playingBtn) { playingBtn.classList.remove('playing'); playingBtn.textContent = '▶'; playingBtn = null; }
+        }
+        function playAudio(src, btn) {
+            if (btn === playingBtn) { stopAudio(); return; }
+            stopAudio(); btn.classList.add('playing'); btn.textContent = '⏹'; playingBtn = btn;
+            currentAudio = new Audio(src);
+            currentAudio.onended = () => { btn.classList.remove('playing'); btn.textContent = '▶'; playingBtn = null; };
+            currentAudio.onerror = () => { btn.classList.remove('playing'); btn.textContent = '❌'; };
+            currentAudio.play().catch(() => { btn.textContent = '❌'; });
+        }
+        function pam(src, btn) { playAudio(src + '?t=' + Date.now(), btn); }
+
+        // ===== Record with preview =====
+        function removePreviewRow(btn) {
+            // Find and remove any existing preview row after this button's row
+            let row = btn.closest('tr');
+            let next = row.nextElementSibling;
+            while (next && (next.classList.contains('text-row') || next.classList.contains('token-drill'))) next = next.nextElementSibling;
+            if (next && next.classList.contains('preview-row')) next.remove();
+        }
+        function rec(uploadPath, btn) {
+            if (activeRecorder && activeRecordBtn === btn) { activeRecorder.stop(); return; }
+            if (activeRecorder) activeRecorder.stop();
+            removePreviewRow(btn);
+            navigator.mediaDevices.getUserMedia({audio:true}).then(stream => {
+                const recorder = new MediaRecorder(stream, {mimeType: MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/mp4'});
+                const chunks = [];
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.onstop = () => {
+                    stream.getTracks().forEach(t=>t.stop());
+                    btn.textContent='🎙'; btn.style.background='#d32f2f'; activeRecorder=null; activeRecordBtn=null;
+                    if(!chunks.length) return;
+                    showPreview(uploadPath, new Blob(chunks,{type:recorder.mimeType}), btn);
+                };
+                recorder.start(); activeRecorder=recorder; activeRecordBtn=btn;
+                btn.textContent='⏹'; btn.style.background='#FF5722';
+            }).catch(()=>{ alert('Microphone access denied'); });
+        }
+        function showPreview(path, blob, originBtn) {
+            if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+            const url = URL.createObjectURL(blob); previewAudio = new Audio(url);
+            removePreviewRow(originBtn);
+            // Find the right row to insert after (skip text-row and token-drill)
+            let row = originBtn.closest('tr');
+            let insertAfter = row;
+            let next = row.nextElementSibling;
+            while (next && (next.classList.contains('text-row') || next.classList.contains('token-drill'))) { insertAfter = next; next = next.nextElementSibling; }
+            const pr = document.createElement('tr');
+            pr.className = 'preview-row';
+            pr.innerHTML = `<td colspan="20" style="background:#E3F2FD;padding:8px 12px;text-align:center">
+                <button class="pv" data-action="listen" style="padding:5px 14px;border-radius:6px;border:1px solid #1976D2;background:#fff;color:#1976D2;cursor:pointer;font-size:0.85rem;margin:0 3px">▶ Listen</button>
+                <button class="pv" data-action="save" style="padding:5px 14px;border-radius:6px;border:1px solid #4CAF50;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-size:0.85rem;font-weight:700;margin:0 3px">✅ Save</button>
+                <button class="pv" data-action="discard" style="padding:5px 14px;border-radius:6px;border:1px solid #d32f2f;background:#FFEBEE;color:#d32f2f;cursor:pointer;font-size:0.85rem;margin:0 3px">✕</button>
+                <span class="preview-status" style="font-size:0.8rem;margin-right:8px"></span>
+            </td>`;
+            insertAfter.insertAdjacentElement('afterend', pr);
+            pr.querySelector('[data-action="listen"]').onclick = function() {
+                if (previewAudio.paused) { previewAudio.currentTime=0; previewAudio.play(); this.textContent='⏹ Stop'; }
+                else { previewAudio.pause(); this.textContent='▶ Listen'; }
+            };
+            previewAudio.onended = () => { pr.querySelector('[data-action="listen"]').textContent='▶ Listen'; };
+            pr.querySelector('[data-action="save"]').onclick = () => {
+                if (previewAudio) { previewAudio.pause(); previewAudio=null; } URL.revokeObjectURL(url);
+                const st = pr.querySelector('.preview-status');
+                st.textContent = 'Uploading...'; st.style.color = '#1976D2';
+                fetch(`${API_BASE}/audio/upload?path=${encodeURIComponent(path)}`,{method:'POST',body:blob})
+                .then(r=>r.json()).then(d=>{ st.textContent=d.ok?'✅ Saved!':'❌ Failed'; st.style.color=d.ok?'#4CAF50':'#d32f2f'; setTimeout(()=>pr.remove(),1500); });
+            };
+            pr.querySelector('[data-action="discard"]').onclick = () => {
+                if (previewAudio) { previewAudio.pause(); previewAudio=null; } URL.revokeObjectURL(url);
+                pr.remove();
+            };
+        }
+        function uploadBlob(path, blob, el) {
+            if(el) { el.textContent='Uploading...'; el.style.color='#1976D2'; }
+            fetch(`${API_BASE}/audio/upload?path=${encodeURIComponent(path)}`,{method:'POST',body:blob})
+            .then(r=>r.json()).then(d=>{ if(el) { el.textContent=d.ok?'✅':'❌'; el.style.color=d.ok?'#4CAF50':'#d32f2f'; } });
+        }
+
+        // ===== Text / Tokens =====
+        function toggleText(btn) {
+            const tr = btn.closest('tr').nextElementSibling;
+            if (tr && tr.classList.contains('text-row')) tr.style.display = tr.style.display === 'none' ? '' : 'none';
+        }
+        function toggleTokens(btn, name, pt, pid) {
+            let sib = btn.closest('tr').nextElementSibling;
+            while (sib && !sib.classList.contains('token-drill')) { if (!sib.classList.contains('text-row')) break; sib = sib.nextElementSibling; }
+            if (sib && sib.classList.contains('token-drill')) { sib.remove(); btn.textContent='🔤'; return; }
+            const tokens = HEBREW.tokenize(name).filter(t=>t!==' ');
+            const sounds = Syllables.build(tokens);
+            let h = '<tr class="token-drill"><td colspan="20"><table style="width:100%;border:2px solid #90CAF9;border-radius:8px"><tbody>';
+            tokens.forEach((t,i) => {
+                const es = encodeURIComponent(sounds[i]), up = `tokens/${es}.mp3`, ap = `audio/tokens/${es}.mp3`;
+                h += `<tr style="background:#f5f5f5"><td style="direction:rtl;padding-right:20px"><span style="font-size:1.1rem;font-family:'Noto Sans Hebrew',sans-serif;background:#fff;padding:2px 8px;border-radius:6px;border:1px solid #ddd">${t}</span> → <span style="color:#888">${sounds[i]}</span></td>
+                <td class="ab"><button class="btn btn-play" style="width:26px;height:26px;font-size:0.7rem" onclick="pam('${ap}',this)">▶</button><button class="btn btn-rec" style="width:26px;height:26px;font-size:0.7rem" onclick="rec('${up}',this)">🎙</button></td></tr>`;
+            });
+            h += '</tbody></table></td></tr>';
+            btn.closest('tr').insertAdjacentHTML('afterend', h); btn.textContent='🔼';
+        }
+
+        // ===== Delete =====
+        function deletePlayer(pid) {
+            if (!confirm('Delete player #' + pid + ' and its audio files?')) return;
+            fetch(`${API_BASE}/players/delete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:pid})})
+            .then(r=>r.json()).then(d=>{
+                if(!d.ok) { alert('Failed'); return; }
+                // Remove both rows (name row + description row) and any text/token rows
+                const row = document.querySelector(`[data-player-id="${pid}"]`);
+                if (row) {
+                    let next = row.nextElementSibling;
+                    // Remove sibling rows that belong to this player (desc row, text-row, token-drill)
+                    while (next && !next.dataset.playerId) {
+                        const toRemove = next;
+                        next = next.nextElementSibling;
+                        toRemove.remove();
+                    }
+                    row.remove();
+                }
+            });
+        }
+        function deleteFunFact(idx) {
+            if (!confirm('Delete fun fact #' + idx + ' and its audio files?')) return;
+            fetch(`${API_BASE}/funfacts/delete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx})})
+            .then(r=>r.json()).then(d=>{
+                if(!d.ok) { alert('Failed'); return; }
+                // Remove both rows (Q row + A row) and any text/token rows
+                const row = document.querySelector(`[data-ff-idx="${idx}"]`);
+                if (row) {
+                    let next = row.nextElementSibling;
+                    while (next && !next.dataset.ffIdx) {
+                        const toRemove = next;
+                        next = next.nextElementSibling;
+                        toRemove.remove();
+                    }
+                    row.remove();
+                }
+            });
+        }
+
+        // ===== Click-to-edit =====
+        function startEdit(el) {
+            if (el.querySelector('input,textarea')) return;
+            const isLong = (el.dataset.val || el.textContent).length > 50;
+            const origText = el.dataset.val || el.textContent.trim();
+            const origHTML = el.innerHTML;
+
+            const input = document.createElement(isLong ? 'textarea' : 'input');
+            input.value = origText;
+            input.style.cssText = 'width:100%;font-size:0.95rem;direction:rtl;padding:6px 8px;border:2px solid #1976D2;border-radius:6px;font-family:Noto Sans Hebrew,sans-serif;' + (isLong?'min-height:70px;resize:vertical;':'');
+
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save';
+            saveBtn.style.cssText = 'padding:5px 20px;background:#4CAF50;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:700;margin-top:4px;margin-left:6px';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'X';
+            cancelBtn.style.cssText = 'padding:5px 12px;background:#d32f2f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;margin-top:4px;margin-left:6px';
+
+            el.innerHTML = '';
+            el.appendChild(input);
+            el.appendChild(saveBtn);
+            el.appendChild(cancelBtn);
+            input.focus();
+
+            cancelBtn.onclick = (e) => { e.stopPropagation(); el.innerHTML = origHTML; el.dataset.val = origText; };
+
+            saveBtn.onclick = (e) => {
+                e.stopPropagation();
+                const val = input.value.trim();
+                if (!val) { alert('Cannot save empty text'); return; }
+                saveBtn.textContent = 'Saving...';
+                saveBtn.disabled = true;
+
+                const type = el.dataset.editType;
+                let url, body;
+                if (type === 'player') {
+                    body = { id: parseInt(el.dataset.pid) };
+                    body[el.dataset.field] = val;
+                    url = `${API_BASE}/players/edit`;
+                } else if (type === 'funfact') {
+                    body = { index: parseInt(el.dataset.ffidx), category: el.dataset.cat || 'general' };
+                    body[el.dataset.field] = val;
+                    url = `${API_BASE}/funfacts/edit`;
+                } else if (type === 'praise') {
+                    body = { array: el.dataset.array, index: parseInt(el.dataset.praiseIdx), text: val };
+                    url = `${API_BASE}/praise/edit`;
+                } else if (type === 'milestone') {
+                    body = { index: parseInt(el.dataset.milestoneIdx) };
+                    body[el.dataset.milestoneField] = val;
+                    url = `${API_BASE}/milestones`;
+                }
+
+                if (!url) { alert('Unknown edit type'); el.innerHTML = origHTML; return; }
+
+                fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+                .then(r => r.json())
+                .then(d => {
+                    if (d.ok) {
+                        // Update in place — no reload
+                        el.innerHTML = val;
+                        el.dataset.val = val;
+                        el.style.outline = '2px solid #4CAF50';
+                        setTimeout(() => { el.style.outline = ''; }, 1500);
+                    } else {
+                        alert('Save failed: ' + (d.error || 'unknown'));
+                        el.innerHTML = origHTML;
+                    }
+                })
+                .catch(err => {
+                    alert('Network error: ' + err.message);
+                    el.innerHTML = origHTML;
+                });
+            };
+        }
+
+        // ===== Inline Edit (legacy) =====
+        function editPlayer(pid, currentName, currentFullName, currentDesc) {
+            const row = document.querySelector(`[data-player-id="${pid}"]`);
+            if (!row) return;
+            const nameCell = row.querySelector('.edit-name');
+            const descRow = row.nextElementSibling;
+            const descCell = descRow ? descRow.querySelector('.edit-desc') : null;
+            if (nameCell.querySelector('input')) return; // already editing
+
+            const origName = currentName;
+            const origFull = currentFullName;
+            const origDesc = currentDesc;
+
+            nameCell.innerHTML = `<input class="edit-input" value="${origName}" style="width:100%;font-family:'Noto Sans Hebrew',sans-serif;font-size:1rem;font-weight:700;direction:rtl;padding:4px">
+                <input class="edit-input" value="${origFull}" style="width:100%;font-size:0.85rem;direction:rtl;padding:4px;margin-top:2px" placeholder="Display name">`;
+            if (descCell) {
+                descCell.innerHTML = `<textarea class="edit-input" style="width:100%;font-size:0.8rem;direction:rtl;padding:4px;min-height:60px;resize:vertical">${origDesc}</textarea>`;
+            }
+            // Change edit button to save/cancel
+            const actionsCell = row.querySelector('.edit-actions');
+            const origActions = actionsCell.innerHTML;
+            actionsCell.innerHTML = `<button class="btn" style="background:#4CAF50;width:auto;border-radius:6px;padding:4px 10px;font-size:0.75rem" onclick="savePlayerEdit(${pid})">Save</button>
+                <button class="btn" style="background:#888;width:auto;border-radius:6px;padding:4px 10px;font-size:0.75rem" onclick="location.reload()">Cancel</button>`;
+        }
+        function savePlayerEdit(pid) {
+            const row = document.querySelector(`[data-player-id="${pid}"]`);
+            const inputs = row.querySelectorAll('.edit-input');
+            const descRow = row.nextElementSibling;
+            const descInput = descRow ? descRow.querySelector('.edit-input') : null;
+            const data = { id: pid, name: inputs[0].value, fullName: inputs[1].value };
+            if (descInput) data.description = descInput.value;
+            fetch(`${API_BASE}/players/edit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+            .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert('Failed'); });
+        }
+
+        function editFunFact(idx, currentQ, currentA, currentCat) {
+            const row = document.querySelector(`[data-ff-idx="${idx}"]`);
+            if (!row) return;
+            const qCell = row.querySelector('.edit-q');
+            const aRow = row.nextElementSibling;
+            const aCell = aRow ? aRow.querySelector('.edit-a') : null;
+            if (qCell.querySelector('input')) return;
+
+            qCell.innerHTML = `<input class="edit-input" value="${currentQ}" style="width:100%;font-weight:700;direction:rtl;padding:4px">`;
+            if (aCell) {
+                aCell.innerHTML = `<input class="edit-input" value="${currentA}" style="width:100%;font-family:'Noto Sans Hebrew',sans-serif;font-size:1rem;direction:rtl;padding:4px">`;
+            }
+            const actionsCell = row.querySelector('.edit-actions');
+            actionsCell.innerHTML = `<button class="btn" style="background:#4CAF50;width:auto;border-radius:6px;padding:4px 10px;font-size:0.75rem" onclick="saveFunFactEdit(${idx},'${currentCat}')">Save</button>
+                <button class="btn" style="background:#888;width:auto;border-radius:6px;padding:4px 10px;font-size:0.75rem" onclick="location.reload()">Cancel</button>`;
+        }
+        function saveFunFactEdit(idx, cat) {
+            const row = document.querySelector(`[data-ff-idx="${idx}"]`);
+            const qInput = row.querySelector('.edit-input');
+            const aRow = row.nextElementSibling;
+            const aInput = aRow ? aRow.querySelector('.edit-input') : null;
+            const data = { index: idx, q: qInput.value, category: cat };
+            if (aInput) data.a = aInput.value;
+            fetch(`${API_BASE}/funfacts/edit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+            .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert('Failed'); });
+        }
+        function deleteAudio(path, btn) {
+            if(!confirm('Delete this praise audio?')) return;
+            fetch(`${API_BASE}/audio/praise-delete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})})
+            .then(r=>r.json()).then(d=>{
+                if(!d.ok) { alert('Failed'); return; }
+                const sec = btn.closest('[data-praise-section]');
+                if(sec) refreshPraiseSection(sec.dataset.praiseSection);
+            });
+        }
+
+        // ===== Add Player =====
+        function toggleAddPlayerForm() {
+            const form = document.getElementById('add-player-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (form.style.display === 'block') {
+                fetch(`${API_BASE}/players/nextid`).then(r=>r.json()).then(d=>{ document.getElementById('ap-id').value = d.nextId; });
+            }
+        }
+        function submitAddPlayer() {
+            const name = document.getElementById('ap-name').value.trim();
+            const fullName = document.getElementById('ap-fullname').value.trim();
+            if (!name || !fullName) { alert('Name and display name are required'); return; }
+            const data = {
+                id: parseInt(document.getElementById('ap-id').value) || 0,
+                name, fullName,
+                team: document.getElementById('ap-team').value.trim() || '',
+                number: parseInt(document.getElementById('ap-number').value) || 0,
+                fotmobId: document.getElementById('ap-fotmob').value.trim() || 'null',
+                colors: document.getElementById('ap-colors').value.trim() || "['#4CAF50','#FFFFFF']",
+                description: document.getElementById('ap-desc').value.trim() || '',
+            };
+            fetch(`${API_BASE}/players/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+            .then(r=>r.json()).then(d=>{
+                if(!d.ok) { alert('Failed: '+(d.error||'')); return; }
+                const pid = data.id;
+                const recArea = document.getElementById('player-rec-area');
+                recArea.style.display = 'block';
+                recArea.innerHTML = `<h3 style="margin:10px 0;color:#333">Player #${pid} added! Record audio:</h3>
+                    <table style="margin:8px 0"><tbody>
+                    <tr><td style="direction:rtl;font-weight:700">${name}<br><small>${fullName}</small></td>
+                        <td><span style="font-size:0.7rem;color:#888">Name</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/names/${pid}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('names/${pid}.mp3',this)">🎙</button></span></td></tr>
+                    <tr><td style="font-size:0.8rem;direction:rtl;color:#555">${data.description||'<em style=\"color:#ccc\">no description</em>'}</td>
+                        <td><span style="font-size:0.7rem;color:#888">Desc</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/${pid}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('${pid}.mp3',this)">🎙</button></span></td></tr>
+                    </tbody></table>
+                    <button onclick="location.reload()" style="padding:8px 20px;border-radius:8px;border:none;background:#333;color:#fff;cursor:pointer;margin-top:8px">Done — reload page</button>`;
+                document.getElementById('add-player-form').style.display = 'none';
+            });
+        }
+
+        // ===== Add Fun Fact =====
+        function toggleAddFunFactForm() {
+            const form = document.getElementById('add-ff-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+        function submitAddFunFact() {
+            const q = document.getElementById('ff-q').value.trim();
+            const a = document.getElementById('ff-a').value.trim();
+            if (!q || !a) { alert('Question and answer are required'); return; }
+            const category = document.getElementById('ff-cat').value || 'general';
+            fetch(`${API_BASE}/funfacts/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q,a,category})})
+            .then(r=>r.json()).then(d=>{
+                if(!d.ok) { alert('Failed: '+(d.error||'')); return; }
+                // Count what the new index will be (current count + 1)
+                const newIdx = (typeof FUN_FACTS!=='undefined' ? FUN_FACTS.length : 0) + 1;
+                // Show inline recording area
+                const recArea = document.getElementById('ff-rec-area');
+                recArea.style.display = 'block';
+                recArea.innerHTML = `<h3 style="margin:10px 0;color:#333">Fun fact #${newIdx} added! Record audio:</h3>
+                    <table style="margin:8px 0"><tbody>
+                    <tr><td style="direction:rtl;font-weight:700">${q}</td>
+                        <td><span style="font-size:0.7rem;color:#888">Q</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/funfacts/q${newIdx}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('funfacts/q${newIdx}.mp3',this)">🎙</button></span></td></tr>
+                    <tr><td class="name-nikud" style="direction:rtl">${a}</td>
+                        <td><span style="font-size:0.7rem;color:#888">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/funfacts/a${newIdx}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('funfacts/a${newIdx}.mp3',this)">🎙</button></span></td></tr>
+                    </tbody></table>
+                    <button onclick="location.reload()" style="padding:8px 20px;border-radius:8px;border:none;background:#333;color:#fff;cursor:pointer;margin-top:8px">Done — reload page</button>`;
+                // Hide the input form
+                document.getElementById('add-ff-form').style.display = 'none';
+            });
+        }
+
+        // ===== Claude Code =====
+        function getOverrideRule() {
+            const force = document.getElementById('force-override');
+            if (force && force.checked) return '\n\nForce override: YES — regenerate all audio files even if they already exist.';
+            return '\n\nDo NOT override existing MP3 files. Only generate audio for files that do not yet exist. Check file existence before generating.';
+        }
+        function reqClaude(type, data) {
+            let p = '';
+            const rule = getOverrideRule();
+            if (type === 'player') {
+                const desc = (typeof DESCRIPTIONS!=='undefined' && DESCRIPTIONS[data.id]) || '';
+                const m = []; if(!desc) m.push('- Write a Hebrew description (2-3 sentences, for a kids reading game)');
+                m.push('- Generate name audio: audio/names/'+data.id+'.mp3');
+                m.push('- Generate description audio: audio/'+data.id+'.mp3');
+                m.push('- Generate token syllable audio');
+                p = `Fill missing content for player #${data.id} in ${APP_TITLE}:\nPlayer: ${data.fullName}\nTeam: ${data.team||''}` + '\n\n' + m.join('\n') + rule;
+            } else if (type === 'all') {
+                const m = []; withImages.forEach(pi => { const d=(typeof DESCRIPTIONS!=='undefined'&&DESCRIPTIONS[pi.id])||''; const g=[]; if(!d)g.push('description'); g.push('audio'); m.push('#'+pi.id+' '+pi.fullName+': needs '+g.join(', ')); });
+                p = `Fill missing content for all players in ${APP_TITLE}:\n\n` + m.join('\n') + rule;
+            } else if (type === 'fact') {
+                const ff = data.ff;
+                const m = [];
+                m.push('- Generate question audio: audio/funfacts/q'+data.idx+'.mp3');
+                m.push('- Generate answer audio: audio/funfacts/a'+data.idx+'.mp3');
+                m.push('- Generate token syllable audio for the answer');
+                p = `Fill audio for fun fact #${data.idx} in ${APP_TITLE}:\nQ: ${ff.q}\nA: ${ff.a}\nCategory: ${ff.category}` + '\n\n' + m.join('\n') + rule;
+            } else if (type === 'selected-facts') {
+                const indices = data.indices;
+                const lines = indices.map(idx => {
+                    const ff = FUN_FACTS[idx-1];
+                    return `#${idx}: Q: ${ff.q} | A: ${ff.a}`;
+                });
+                p = `Generate audio for the following ${indices.length} fun facts in ${APP_TITLE}:\n\n` + lines.join('\n') + '\n\nFor each, generate:\n- Question audio: audio/funfacts/q{N}.mp3\n- Answer audio: audio/funfacts/a{N}.mp3\n- Token syllable audio for the answer' + rule;
+            } else if (type === 'facts') {
+                p = `Generate audio for all ${FUN_FACTS.length} fun facts in ${APP_TITLE} using OpenAI TTS.\nGenerate both question (q1..q${FUN_FACTS.length}.mp3) and answer (a1..a${FUN_FACTS.length}.mp3) files in audio/funfacts/.\nAlso generate token syllable audio for all answers.` + rule;
+            }
+            navigator.clipboard.writeText(p).then(()=>alert('Copied to clipboard! Paste into Claude Code.')).catch(()=>prompt('Copy this:',p));
+        }
+        function reqClaudeSelected() {
+            const checks = document.querySelectorAll('.ff-select:checked');
+            if (!checks.length) { alert('No fun facts selected'); return; }
+            const indices = [...checks].map(c => parseInt(c.dataset.idx));
+            reqClaude('selected-facts', {indices});
+        }
+        function toggleAllFF(master) {
+            document.querySelectorAll('.ff-select').forEach(c => c.checked = master.checked);
+        }
+
+        // ===== Collapsible sections =====
+        function makeSection(id, title, buildFn) {
+            const h = document.createElement('div'); h.className='section-header';
+            h.innerHTML = `<span>${title}</span><span class="arrow">▶</span>`;
+            const b = document.createElement('div'); b.className='section-body'; b.id=id;
+            h.onclick = () => { h.classList.toggle('open'); b.classList.toggle('open'); if(b.classList.contains('open')&&!b.dataset.built){b.dataset.built='1';buildFn(b);} };
+            return {header:h, body:b};
+        }
+
+        // ===== Praise (dynamic) =====
+        const FOLDER_TO_ARRAY = {
+            'correct-letter': 'CORRECT_TEXTS',
+            'name-complete': 'COMPLETE_TEXTS',
+            'wrong-letter': 'WRONG_TEXTS',
+        };
+        function audioRowHTML(label, audioPath, uploadPath, opts) {
+            opts=opts||{};
+            const delBtn = opts.deletable?`<button class="btn btn-del" style="width:26px;height:26px;font-size:0.65rem" onclick="deleteAudio('${uploadPath}',this)">🗑</button>`:'';
+            let labelHTML;
+            if (opts.praiseArray && opts.praiseIdx !== undefined) {
+                const escLabel = (label||'').replace(/'/g,"\\'");
+                labelHTML = `<span class="editable" onclick="startEdit(this)" data-edit-type="praise" data-array="${opts.praiseArray}" data-praise-idx="${opts.praiseIdx}" data-val="${escLabel}">${label}</span>`;
+            } else {
+                labelHTML = label;
+            }
+            return `<tr><td style="direction:rtl;font-weight:700">${labelHTML}</td><td class="ab"><button class="btn btn-play" onclick="pam('${audioPath}',this)">▶</button><button class="btn btn-rec" onclick="rec('${uploadPath}',this)">🎙</button>${delBtn}</td></tr>`;
+        }
+        async function refreshPraiseSection(folder) {
+            const files = await fetch(`${API_BASE}/audio/list?dir=${encodeURIComponent(PRAISE_FOLDER+'/'+folder)}`).then(r=>r.json());
+            const count = files.filter(f=>f.endsWith('.mp3')).length;
+            const c = document.querySelector(`[data-praise-section="${folder}"] tbody`); if(!c) return;
+            // Always fetch fresh labels from server
+            const freshLabels = await fetch(`${API_BASE}/praise/texts`).then(r=>r.json()).catch(()=>({}));
+            const arrayName = FOLDER_TO_ARRAY[folder] || '';
+            const labels = (freshLabels[arrayName] || PRAISE_LABELS[folder] || []);
+            let h='';
+            for(let i=1;i<=count;i++) {
+                h+=audioRowHTML(labels[i-1]||`#${i}`,`audio/${PRAISE_FOLDER}/${folder}/${i}.mp3`,`${PRAISE_FOLDER}/${folder}/${i}.mp3`,{deletable:true, praiseArray:arrayName, praiseIdx:i-1});
+            }
+            c.innerHTML=h;
+        }
+        function addPraiseSlot(folder) {
+            const c = document.querySelector(`[data-praise-section="${folder}"] tbody`);
+            const n = c.querySelectorAll('tr:not(.text-row)').length+1;
+            const arrayName = FOLDER_TO_ARRAY[folder] || '';
+            c.insertAdjacentHTML('beforeend', audioRowHTML(`#${n}`,`audio/${PRAISE_FOLDER}/${folder}/${n}.mp3`,`${PRAISE_FOLDER}/${folder}/${n}.mp3`,{deletable:true, praiseArray:arrayName, praiseIdx:n-1}));
+        }
+
+        // ============================================================
+        // BUILD SECTIONS
+        // ============================================================
+        const root = document.getElementById('app-content');
+
+        // 1. Title
+        const s1=makeSection('s-title','🎵 Title',el=>{
+            el.innerHTML='<table><tbody>'+audioRowHTML(APP_TITLE,'audio/title.mp3','title.mp3')+'</tbody></table>';
+        }); root.appendChild(s1.header); root.appendChild(s1.body);
+
+        // 2. Praise
+        [{f:'correct-letter',i:'✅',t:'Correct Letter Praise'},{f:'name-complete',i:'🎉',t:'Name Complete Praise'},{f:'wrong-letter',i:'❌',t:'Wrong Letter'},{f:'milestone-reward',i:'🏆',t:'Milestone Reward Audio'}].forEach(s=>{
+            const sec=makeSection('s-'+s.f,`${s.i} ${s.t}`,el=>{
+                el.innerHTML=`<div style="margin:8px 0"><button class="btn btn-play" style="background:#4CAF50;width:30px;height:30px" onclick="addPraiseSlot('${s.f}')">+</button></div><div data-praise-section="${s.f}"><table><tbody><tr><td style="text-align:center;color:#999">Loading...</td></tr></tbody></table></div>`;
+                refreshPraiseSection(s.f);
+            }); root.appendChild(sec.header); root.appendChild(sec.body);
+        });
+
+        // Milestone texts (icon + text shown on screen every 10 points)
+        const sMile=makeSection('s-milestones','🏆 Milestone Texts (every 10 points)',async el=>{
+            const milestones = await fetch(`${API_BASE}/milestones`).then(r=>r.json()).catch(()=>[]);
+            let h='<table><thead><tr><th>#</th><th>Icon</th><th>Text</th><th></th></tr></thead><tbody>';
+            milestones.forEach((m,i) => {
+                const escText = (m.text||'').replace(/'/g,"\\'");
+                const escIcon = (m.icon||'').replace(/'/g,"\\'");
+                h+=`<tr>
+                    <td>${i+1}</td>
+                    <td><span class="editable" onclick="startEdit(this)" data-edit-type="milestone" data-milestone-idx="${i}" data-milestone-field="icon" data-val="${escIcon}" style="font-size:1.5rem">${m.icon}</span></td>
+                    <td class="editable" onclick="startEdit(this)" data-edit-type="milestone" data-milestone-idx="${i}" data-milestone-field="text" data-val="${escText}" style="direction:rtl;font-weight:700;font-size:1rem">${m.text}</td>
+                    <td></td>
+                </tr>`;
+            });
+            h+='</tbody></table>';
+            el.innerHTML=h;
+        }); root.appendChild(sMile.header); root.appendChild(sMile.body);
+
+        // 3. Players
+        const s3=makeSection('s-players','⚽ Players ('+withImages.length+')',el=>{
+            let h=`<div class="toolbar">
+                <button onclick="toggleAddPlayerForm()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ Add Player</button>
+                <button onclick="reqClaude('all')" style="background:#F3E5F5;color:#7B1FA2;border-color:#9C27B0">🤖 Claude Code — fill gaps</button>
+            </div>
+            <div class="add-form" id="add-player-form">
+                <input type="hidden" id="ap-id">
+                <label class="required">Game name (with nikud)</label><input id="ap-name" placeholder="e.g. לִיאוֹנֶל מֶסִי">
+                <label class="required">Display name</label><input id="ap-fullname" placeholder="e.g. ליאונל מסי">
+                <label>Team</label><input id="ap-team" placeholder="e.g. מכבי תל אביב">
+                <label>Shirt number</label><input id="ap-number" type="number" value="0">
+                <label>FotMob ID</label><input id="ap-fotmob" placeholder="e.g. 30981 (for player image)">
+                <label>Team colors</label><input id="ap-colors" value="['#4CAF50','#FFFFFF']">
+                <label>Description (Hebrew)</label><input id="ap-desc" placeholder="Optional — or use Claude Code to generate">
+                <div class="form-actions">
+                    <button onclick="submitAddPlayer()" style="background:#4CAF50;color:#fff">Add Player</button>
+                    <button onclick="toggleAddPlayerForm()" style="background:#eee;color:#333">Cancel</button>
+                </div>
+            </div>
+            <div id="player-rec-area" style="display:none;background:#E8F5E9;border:2px solid #4CAF50;border-radius:12px;padding:16px;margin:12px 0"></div>`;
+            h+='<table><thead><tr><th>#</th><th></th><th>Info</th><th>Tokens</th><th>Audio</th><th></th></tr></thead><tbody>';
+            withImages.forEach(p=>{
+                const tokens=HEBREW.tokenize(p.name).filter(t=>t!==' ');
+                const sounds=Syllables.build(tokens);
+                const tp=tokens.map((t,i)=>t+'→'+sounds[i]).join(' | ');
+                const desc=(typeof DESCRIPTIONS!=='undefined'&&DESCRIPTIONS[p.id])||'';
+                const nt=p.name;
+                const escName = nt.replace(/'/g,"\\'");
+                const escFull = p.fullName.replace(/'/g,"\\'");
+                const escDesc = desc.replace(/'/g,"\\'");
+                h+=`<tr data-player-id="${p.id}">
+                    <td rowspan="2" style="vertical-align:middle">${p.id}</td>
+                    <td rowspan="2" style="vertical-align:middle"><img class="img-thumb" src="${p.image}" onerror="this.src='icon-192.png'"></td>
+                    <td><div class="editable name-nikud" onclick="startEdit(this)" data-edit-type="player" data-pid="${p.id}" data-field="name" data-val="${escName}">${p.name}</div><div class="editable" onclick="startEdit(this)" data-edit-type="player" data-pid="${p.id}" data-field="fullName" data-val="${escFull}" style="font-size:0.85rem;color:#555;margin-top:2px">${p.fullName}</div></td>
+                    <td rowspan="2" style="vertical-align:middle"><span class="token-preview">${tp}</span>
+                        <button class="btn btn-tok" style="width:22px;height:22px;font-size:0.6rem" onclick="toggleTokens(this,'${escName}','p',${p.id})">🔤</button></td>
+                    <td><span style="font-size:0.7rem;color:#888;margin-left:4px">Name</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/names/${p.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('names/${p.id}.mp3',this)">🎙</button></span></td>
+                    <td rowspan="2" style="vertical-align:middle;text-align:center">
+                        <button class="btn btn-claude" style="width:28px;height:28px;font-size:0.7rem" onclick="reqClaude('player',{id:${p.id},fullName:'${escFull}',name:'${escName}',team:'${(p.team||'').replace(/'/g,"\\'")}'})" title="Claude Code">🤖</button>
+                        <button class="btn btn-del" style="width:28px;height:28px;font-size:0.7rem" onclick="deletePlayer(${p.id})">🗑</button>
+                    </td>
+                </tr>
+                <tr style="border-bottom:2px solid #ddd">
+                    <td class="editable" onclick="startEdit(this)" data-edit-type="player" data-pid="${p.id}" data-field="description" data-val="${escDesc}" style="font-size:0.78rem;direction:rtl;line-height:1.5;color:#555">${desc||'<em style="color:#ccc">click to add description</em>'}</td>
+                    <td><span style="font-size:0.7rem;color:#888;margin-left:4px">Desc</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/${p.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('${p.id}.mp3',this)">🎙</button></span></td>
+                </tr>`;
+            });
+            h+='</tbody></table>';
+            el.innerHTML=h;
+        }); root.appendChild(s3.header); root.appendChild(s3.body);
+
+        // 4. Fun Facts
+        const s4=makeSection('s-ff','🧠 Fun Facts ('+(typeof FUN_FACTS!=='undefined'?FUN_FACTS.length:0)+')',el=>{
+            let h=`<div class="toolbar">
+                <button onclick="toggleAddFunFactForm()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ Add Fun Fact</button>
+                <button onclick="reqClaudeSelected()" style="background:#F3E5F5;color:#7B1FA2;border-color:#9C27B0">🤖 Generate selected</button>
+                <button onclick="reqClaude('facts')" style="background:#F3E5F5;color:#7B1FA2;border-color:#9C27B0">🤖 Generate all</button>
+                <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.85rem;cursor:pointer;margin-right:8px"><input type="checkbox" id="force-override"> Force override existing</label>
+            </div>
+            <div class="add-form" id="add-ff-form">
+                <label class="required">Question (Hebrew)</label><input id="ff-q" placeholder="e.g. ?מי זכתה בגביע העולם ב-2022">
+                <label class="required">Answer with nikud</label><input id="ff-a" placeholder="e.g. אַרְגֶּנְטִינָה">
+                <label>Category</label>
+                <select id="ff-cat" style="direction:ltr;text-align:left">
+                    <option value="worldcup">🏆 World Cup</option>
+                    <option value="champions">⚽ Champions League</option>
+                    <option value="israel">🇮🇱 Israel</option>
+                    <option value="netanya">💎 Netanya</option>
+                    <option value="nba">🏀 NBA</option>
+                    <option value="neri">⭐ Neri</option>
+                    <option value="general">General</option>
+                </select>
+                <div class="form-actions">
+                    <button onclick="submitAddFunFact()" style="background:#4CAF50;color:#fff">Add Fun Fact</button>
+                    <button onclick="toggleAddFunFactForm()" style="background:#eee;color:#333">Cancel</button>
+                </div>
+            </div>
+            <div id="ff-rec-area" style="display:none;background:#E8F5E9;border:2px solid #4CAF50;border-radius:12px;padding:16px;margin:12px 0"></div>`;
+            h+='<table><thead><tr><th><input type="checkbox" onchange="toggleAllFF(this)" title="Select all"></th><th>#</th><th>Cat</th><th>Content</th><th>Audio</th><th></th></tr></thead><tbody>';
+            if(typeof FUN_FACTS!=='undefined') {
+                const ce={worldcup:'🏆',champions:'⚽',israel:'🇮🇱',nba:'🏀',neri:'⭐',netanya:'💎'};
+                FUN_FACTS.forEach((ff,i)=>{
+                    const idx=i+1, at=ff.a;
+                    const escQ = ff.q.replace(/'/g,"\\'");
+                    const escA = at.replace(/'/g,"\\'");
+                    h+=`<tr data-ff-idx="${idx}">
+                        <td rowspan="2" style="vertical-align:middle"><input type="checkbox" class="ff-select" data-idx="${idx}"></td>
+                        <td rowspan="2" style="vertical-align:middle">${idx}</td>
+                        <td rowspan="2" style="vertical-align:middle">${ce[ff.category]||'❓'}</td>
+                        <td class="editable" onclick="startEdit(this)" data-edit-type="funfact" data-ffidx="${idx}" data-field="q" data-cat="${ff.category}" data-val="${escQ}" style="direction:rtl;font-weight:700">${ff.q}</td>
+                        <td><span style="font-size:0.7rem;color:#888;margin-left:4px">Q</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/funfacts/q${idx}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('funfacts/q${idx}.mp3',this)">🎙</button></span></td>
+                        <td rowspan="2" style="vertical-align:middle;text-align:center">
+                            <button class="btn btn-claude" style="width:28px;height:28px;font-size:0.7rem" onclick="reqClaude('fact',{idx:${idx},ff:FUN_FACTS[${i}]})" title="Claude Code">🤖</button>
+                            <button class="btn btn-del" style="width:28px;height:28px;font-size:0.7rem" onclick="deleteFunFact(${idx})">🗑</button>
+                        </td>
+                    </tr>
+                    <tr style="border-bottom:2px solid #ddd">
+                        <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="funfact" data-ffidx="${idx}" data-field="a" data-cat="${ff.category}" data-val="${escA}">${ff.a}</span>
+                            <button class="btn btn-tok" style="width:22px;height:22px;font-size:0.6rem" onclick="toggleTokens(this,'${escA}','ff',${idx})">🔤</button></td>
+                        <td><span style="font-size:0.7rem;color:#888;margin-left:4px">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/funfacts/a${idx}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('funfacts/a${idx}.mp3',this)">🎙</button></span></td>
+                    </tr>`;
+                });
+            }
+            h+='</tbody></table>';
+            el.innerHTML=h;
+        }); root.appendChild(s4.header); root.appendChild(s4.body);
+    </script>
+</body>
+</html>

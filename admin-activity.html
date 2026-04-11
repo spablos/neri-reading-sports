@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Tracker — נרי לומד לקרוא</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        .stats { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .stat-card { background: #fff; padding: 15px 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+        .stat-num { font-size: 2rem; font-weight: 900; color: #1976D2; }
+        .stat-label { font-size: 0.8rem; color: #666; margin-top: 2px; }
+        .controls { text-align: center; margin-bottom: 15px; }
+        .controls button { padding: 8px 20px; margin: 0 5px; font-size: 0.9rem; border-radius: 8px; border: 2px solid #333; cursor: pointer; background: #fff; }
+        .controls button:hover { background: #e3f2fd; }
+        .controls button.active { background: #1976D2; color: #fff; border-color: #1976D2; }
+        .filters { text-align: center; margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; align-items: center; }
+        .filters label { font-size: 0.85rem; color: #555; }
+        .filters select, .filters input { padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.85rem; }
+        .filters input { width: 160px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-size: 0.82rem; }
+        th { background: #333; color: #fff; padding: 8px 6px; text-align: left; position: sticky; top: 0; font-size: 0.75rem; cursor: pointer; white-space: nowrap; }
+        th:hover { background: #555; }
+        th .sort-arrow { margin-left: 4px; font-size: 0.65rem; opacity: 0.5; }
+        th.sorted .sort-arrow { opacity: 1; }
+        td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        tr:hover { background: #f0f8ff; }
+        .device-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; color: #fff; }
+        .device-iOS { background: #007AFF; }
+        .device-Android { background: #3DDC84; color: #000; }
+        .device-Mac { background: #555; }
+        .device-Windows { background: #0078D4; }
+        .device-Linux { background: #FCC624; color: #000; }
+        .device-Unknown { background: #999; }
+        .browser-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; background: #e3f2fd; color: #1565c0; }
+        .time-ago { color: #999; font-size: 0.75rem; }
+        .ip { font-family: monospace; font-size: 0.8rem; }
+        #loading { text-align: center; padding: 40px; color: #999; }
+        .error { color: #d32f2f; text-align: center; padding: 20px; }
+        .row-count { text-align: center; font-size: 0.8rem; color: #999; margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>📊 Activity Tracker</h1>
+    <div class="stats" id="stats"></div>
+    <h2 style="text-align:center; margin:15px 0 8px; color:#555">👤 By Identity</h2>
+    <div class="stats" id="identity-stats"></div>
+    <div class="controls">
+        <button onclick="loadData()">🔄 Refresh</button>
+        <button onclick="toggleView()">Toggle: All / Unique Devices</button>
+    </div>
+    <div class="filters">
+        <label>Identity:</label>
+        <select id="filter-identity" onchange="applyView()">
+            <option value="">All</option>
+            <option value="neri">נרי</option>
+            <option value="ivri">עברי</option>
+            <option value="boomerim">בומרים</option>
+            <option value="unknown">Unknown</option>
+        </select>
+        <label>Device:</label>
+        <select id="filter-device" onchange="applyView()">
+            <option value="">All</option>
+            <option value="iOS">iOS</option>
+            <option value="Android">Android</option>
+            <option value="Mac">Mac</option>
+            <option value="Windows">Windows</option>
+            <option value="Linux">Linux</option>
+        </select>
+        <label>Browser:</label>
+        <select id="filter-browser" onchange="applyView()">
+            <option value="">All</option>
+            <option value="Safari">Safari</option>
+            <option value="Chrome">Chrome</option>
+            <option value="Chrome iOS">Chrome iOS</option>
+            <option value="Firefox">Firefox</option>
+            <option value="Edge">Edge</option>
+        </select>
+        <label>IP:</label>
+        <input id="filter-ip" placeholder="Filter by IP..." oninput="applyView()">
+        <label>Location:</label>
+        <input id="filter-location" placeholder="Filter by city/country..." oninput="applyView()">
+        <button onclick="clearFilters()" style="font-size:0.8rem; padding:6px 14px; border:1px solid #ccc; border-radius:6px; background:#fff; cursor:pointer">Clear filters</button>
+    </div>
+    <div class="row-count" id="row-count"></div>
+    <div id="loading">Loading...</div>
+    <table id="activity-table" style="display:none">
+        <thead>
+            <tr>
+                <th data-col="#">#</th>
+                <th data-col="who" onclick="sortBy('who')">Who <span class="sort-arrow">▲▼</span></th>
+                <th data-col="time" onclick="sortBy('time')">Time <span class="sort-arrow">▲▼</span></th>
+                <th data-col="duration" onclick="sortBy('duration')">Duration <span class="sort-arrow">▲▼</span></th>
+                <th data-col="deviceId">Device ID</th>
+                <th data-col="ip" onclick="sortBy('ip')">IP <span class="sort-arrow">▲▼</span></th>
+                <th data-col="location" onclick="sortBy('location')">Location <span class="sort-arrow">▲▼</span></th>
+                <th data-col="device" onclick="sortBy('device')">Device <span class="sort-arrow">▲▼</span></th>
+                <th data-col="browser" onclick="sortBy('browser')">Browser <span class="sort-arrow">▲▼</span></th>
+                <th data-col="screen">Screen</th>
+                <th data-col="language">Language</th>
+            </tr>
+        </thead>
+        <tbody id="activity-list"></tbody>
+    </table>
+    <div id="error-msg" class="error" style="display:none"></div>
+
+    <script>
+        let allData = [];
+        let showUnique = false;
+        let sortCol = 'time';
+        let sortAsc = false; // default: newest first
+
+        const idNames = { neri: 'נרי', ivri: 'עברי', boomerim: 'בומרים' };
+
+        function formatDuration(seconds) {
+            if (seconds < 60) return seconds + 's';
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            if (mins < 60) return mins + 'm ' + secs + 's';
+            const hrs = Math.floor(mins / 60);
+            return hrs + 'h ' + (mins % 60) + 'm';
+        }
+
+        function timeAgo(dateStr) {
+            const diff = Date.now() - new Date(dateStr).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h ago';
+            const days = Math.floor(hrs / 24);
+            return days + 'd ago';
+        }
+
+        function formatTime(dateStr) {
+            try {
+                const d = new Date(dateStr);
+                return d.toLocaleString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+            } catch(e) { return dateStr; }
+        }
+
+        function getTime(d) {
+            return new Date(d.serverTime || d.localTime || 0).getTime();
+        }
+
+        function getLocation(d) {
+            const geo = d.geo || {};
+            return [geo.city, geo.country].filter(Boolean).join(', ');
+        }
+
+        function toggleView() {
+            showUnique = !showUnique;
+            applyView();
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-identity').value = '';
+            document.getElementById('filter-device').value = '';
+            document.getElementById('filter-browser').value = '';
+            document.getElementById('filter-ip').value = '';
+            document.getElementById('filter-location').value = '';
+            applyView();
+        }
+
+        function sortBy(col) {
+            if (sortCol === col) {
+                sortAsc = !sortAsc;
+            } else {
+                sortCol = col;
+                sortAsc = (col === 'who' || col === 'device' || col === 'browser' || col === 'location' || col === 'ip');
+            }
+            // Update header styles
+            document.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sorted');
+                const arrow = th.querySelector('.sort-arrow');
+                if (arrow) arrow.textContent = '▲▼';
+            });
+            const activeTh = document.querySelector(`th[data-col="${col}"]`);
+            if (activeTh) {
+                activeTh.classList.add('sorted');
+                const arrow = activeTh.querySelector('.sort-arrow');
+                if (arrow) arrow.textContent = sortAsc ? '▲' : '▼';
+            }
+            applyView();
+        }
+
+        function applyView() {
+            let rows = [...allData];
+
+            // Filters
+            const fIdentity = document.getElementById('filter-identity').value;
+            const fDevice = document.getElementById('filter-device').value;
+            const fBrowser = document.getElementById('filter-browser').value;
+            const fIp = document.getElementById('filter-ip').value.toLowerCase();
+            const fLocation = document.getElementById('filter-location').value.toLowerCase();
+
+            if (fIdentity) {
+                if (fIdentity === 'unknown') {
+                    rows = rows.filter(d => !d.identity);
+                } else {
+                    rows = rows.filter(d => d.identity === fIdentity);
+                }
+            }
+            if (fDevice) rows = rows.filter(d => d.device === fDevice);
+            if (fBrowser) rows = rows.filter(d => d.browser === fBrowser);
+            if (fIp) rows = rows.filter(d => (d.ip || '').toLowerCase().includes(fIp));
+            if (fLocation) rows = rows.filter(d => getLocation(d).toLowerCase().includes(fLocation));
+
+            // Unique devices
+            if (showUnique) {
+                const seen = new Set();
+                rows = rows.sort((a, b) => getTime(b) - getTime(a)); // newest first for dedup
+                rows = rows.filter(d => {
+                    const key = d.deviceId || d.ip;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+            }
+
+            // Sort
+            rows.sort((a, b) => {
+                let va, vb;
+                switch (sortCol) {
+                    case 'time':
+                        va = getTime(a); vb = getTime(b); break;
+                    case 'duration':
+                        va = a.duration || 0; vb = b.duration || 0; break;
+                    case 'who':
+                        va = a.identity || ''; vb = b.identity || ''; break;
+                    case 'device':
+                        va = a.device || ''; vb = b.device || ''; break;
+                    case 'browser':
+                        va = a.browser || ''; vb = b.browser || ''; break;
+                    case 'ip':
+                        va = a.ip || ''; vb = b.ip || ''; break;
+                    case 'location':
+                        va = getLocation(a); vb = getLocation(b); break;
+                    default:
+                        va = getTime(a); vb = getTime(b);
+                }
+                if (typeof va === 'string') {
+                    const cmp = va.localeCompare(vb);
+                    return sortAsc ? cmp : -cmp;
+                }
+                return sortAsc ? va - vb : vb - va;
+            });
+
+            renderTable(rows);
+        }
+
+        function renderStats(data) {
+            const uniqueDevices = new Set(data.map(d => d.deviceId || d.ip)).size;
+            const uniqueIPs = new Set(data.map(d => d.ip)).size;
+            const today = data.filter(d => {
+                const t = new Date(d.serverTime || d.localTime);
+                const now = new Date();
+                return t.toDateString() === now.toDateString();
+            }).length;
+            const totalTime = data.reduce((sum, d) => sum + (d.duration || 0), 0);
+            const devices = {};
+            data.forEach(d => { devices[d.device || 'Unknown'] = (devices[d.device || 'Unknown'] || 0) + 1; });
+            const topDevice = Object.entries(devices).sort((a,b) => b[1]-a[1])[0];
+
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card"><div class="stat-num">${data.length}</div><div class="stat-label">Total Sessions</div></div>
+                <div class="stat-card"><div class="stat-num">${uniqueDevices}</div><div class="stat-label">Unique Devices</div></div>
+                <div class="stat-card"><div class="stat-num">${today}</div><div class="stat-label">Today</div></div>
+                <div class="stat-card"><div class="stat-num">${formatDuration(totalTime)}</div><div class="stat-label">Total Play Time</div></div>
+                <div class="stat-card"><div class="stat-num">${topDevice ? topDevice[0] : '-'}</div><div class="stat-label">Top Device</div></div>
+            `;
+        }
+
+        function renderTable(rows) {
+            document.getElementById('row-count').textContent = rows.length + ' sessions shown';
+            const tbody = document.getElementById('activity-list');
+            tbody.innerHTML = rows.map((d, i) => {
+                const geo = d.geo || {};
+                const loc = [geo.city, geo.country].filter(Boolean).join(', ') || '-';
+                const isp = geo.isp || '';
+                const dur = d.duration ? formatDuration(d.duration) : (d.lastSeen ? 'active' : '-');
+                const who = d.identity ? (idNames[d.identity] || d.identity) : '-';
+                return `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td><b>${who}</b></td>
+                    <td>${formatTime(d.serverTime || d.localTime)}<br><span class="time-ago">${timeAgo(d.serverTime || d.localTime)}</span></td>
+                    <td><b>${dur}</b></td>
+                    <td style="font-size:0.7rem;font-family:monospace;color:#666">${d.deviceId || '-'}</td>
+                    <td class="ip">${d.ip || '-'}</td>
+                    <td>${loc}<br><small style="color:#999">${isp}</small></td>
+                    <td><span class="device-badge device-${d.device || 'Unknown'}">${d.device || '?'}</span></td>
+                    <td><span class="browser-badge">${d.browser || '?'}</span></td>
+                    <td>${d.screenW || '?'}×${d.screenH || '?'}<br><small>${d.viewportW || ''}×${d.viewportH || ''} @${d.pixelRatio || 1}x</small></td>
+                    <td>${d.language || '-'}</td>
+                </tr>`;
+            }).join('');
+            document.getElementById('activity-table').style.display = '';
+        }
+
+        function renderIdentityStats(data) {
+            const identities = {};
+            data.forEach(d => {
+                const id = d.identity || 'unknown';
+                if (!identities[id]) identities[id] = { count: 0, totalTime: 0, lastSeen: null };
+                identities[id].count++;
+                identities[id].totalTime += d.duration || 0;
+                const t = d.serverTime || d.localTime;
+                if (!identities[id].lastSeen || t > identities[id].lastSeen) identities[id].lastSeen = t;
+            });
+            const el = document.getElementById('identity-stats');
+            // Show in fixed order: neri, ivri, boomerim, then unknown
+            const order = ['neri', 'ivri', 'boomerim'];
+            const allIds = [...order.filter(k => identities[k]), ...Object.keys(identities).filter(k => !order.includes(k))];
+            el.innerHTML = allIds.map(id => {
+                const s = identities[id];
+                const name = idNames[id] || id;
+                const last = s.lastSeen ? timeAgo(s.lastSeen) : '';
+                return `
+                    <div class="stat-card" style="cursor:pointer" onclick="document.getElementById('filter-identity').value='${id}';applyView()">
+                        <div class="stat-num">${name}</div>
+                        <div class="stat-label">${s.count} sessions · ${formatDuration(s.totalTime)}</div>
+                        <div class="stat-label" style="color:#aaa">${last ? 'Last: ' + last : ''}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function loadData() {
+            document.getElementById('loading').style.display = '';
+            document.getElementById('error-msg').style.display = 'none';
+            try {
+                const resp = await fetch('/neri/api/data?t=' + Date.now());
+                if (!resp.ok) throw new Error('API returned ' + resp.status);
+                allData = await resp.json();
+                renderStats(allData);
+                renderIdentityStats(allData);
+                applyView();
+                document.getElementById('loading').style.display = 'none';
+            } catch(e) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error-msg').style.display = '';
+                document.getElementById('error-msg').textContent = 'Failed to load: ' + e.message + '. Make sure the tracker server is running.';
+            }
+        }
+
+        loadData();
+        setInterval(loadData, 30000); // auto-refresh every 30s
+    </script>
+</body>
+</html>
