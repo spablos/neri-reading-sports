@@ -10,7 +10,8 @@ const HEBREW = {
 
     isLetter(ch) {
         const c = ch.codePointAt(0);
-        return c >= this.LETTER_START && c <= this.LETTER_END;
+        return (c >= this.LETTER_START && c <= this.LETTER_END) ||
+               (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A); // A-Z, a-z
     },
 
     isNikud(ch) {
