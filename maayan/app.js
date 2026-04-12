@@ -1122,7 +1122,7 @@ class Game {
 
     initTracingCanvases() {
         const dpr = window.devicePixelRatio || 1;
-        const GRID = 7; // 7x7 grid for structural matching
+        const GRID = 10; // 10x10 grid for structural matching
         this.tracingZones.forEach(zone => {
             const rect = zone.element.getBoundingClientRect();
             const w = Math.round(rect.width);
