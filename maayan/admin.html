@@ -620,6 +620,15 @@
                 p = `Generate audio for the following ${indices.length} fun facts in ${APP_TITLE}:\n\n` + lines.join('\n') + '\n\nFor each, generate:\n- Question audio: audio/funfacts/q{N}.mp3\n- Answer audio: audio/funfacts/a{N}.mp3\n- Token syllable audio for the answer' + rule;
             } else if (type === 'facts') {
                 p = `Generate audio for all ${FUN_FACTS.length} fun facts in ${APP_TITLE} using OpenAI TTS.\nGenerate both question (q1..q${FUN_FACTS.length}.mp3) and answer (a1..a${FUN_FACTS.length}.mp3) files in audio/funfacts/.\nAlso generate token syllable audio for all answers.` + rule;
+            } else if (type === 'section-item') {
+                const m = [];
+                m.push('- Generate prompt audio: audio/sections/'+data.sid+'/prompt_'+data.itemId+'.mp3');
+                m.push('- Generate answer audio: audio/sections/'+data.sid+'/answer_'+data.itemId+'.mp3');
+                m.push('- Generate token syllable audio for the answer');
+                p = `Fill audio for custom section item in ${APP_TITLE}:\nSection: ${data.sectionLabel}\nPrompt: ${data.prompt}\nAnswer: ${data.answer}` + '\n\n' + m.join('\n') + rule;
+            } else if (type === 'section-all') {
+                const lines = data.items.map(it => `  #${it.id}: Q: ${it.prompt||it.answer} | A: ${it.answer}`);
+                p = `Generate audio for all ${data.items.length} items in section "${data.sectionLabel}" of ${APP_TITLE}:\n\n` + lines.join('\n') + '\n\nFor each item, generate:\n- Prompt audio: audio/sections/'+data.sid+'/prompt_{id}.mp3\n- Answer audio: audio/sections/'+data.sid+'/answer_{id}.mp3\n- Token syllable audio for the answer' + rule;
             }
             navigator.clipboard.writeText(p).then(()=>alert('Copied to clipboard! Paste into Claude Code.')).catch(()=>prompt('Copy this:',p));
         }
@@ -955,13 +964,57 @@
             const body = {id: sid}; body[field] = value;
             await fetch(`${API_BASE}/sections/edit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
         }
+        // ===== Image search (Wikimedia Commons) =====
+        let _imgTimer = null;
+        function searchImages(query, resultsId) {
+            clearTimeout(_imgTimer);
+            const results = document.getElementById(resultsId);
+            if (!results || query.length < 2) { if(results) results.style.display = 'none'; return; }
+            _imgTimer = setTimeout(async () => {
+                results.innerHTML = '<div style="padding:8px;color:#999;text-align:center">Searching...</div>';
+                results.style.display = 'block';
+                try {
+                    const resp = await fetch(`${API_BASE}/image/search?q=${encodeURIComponent(query)}`);
+                    const images = await resp.json();
+                    if (!images.length) { results.innerHTML = '<div style="padding:8px;color:#999;text-align:center">No results</div>'; return; }
+                    let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:6px">';
+                    images.forEach(img => {
+                        h += `<img src="${img.thumb}" title="${img.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent" onclick="selectSearchImage(this,'${resultsId}')" onerror="this.remove()">`;
+                    });
+                    h += '</div>';
+                    results.innerHTML = h;
+                } catch(e) { results.innerHTML = '<div style="padding:8px;color:#c00;text-align:center">Search failed</div>'; }
+            }, 400);
+        }
+        function selectSearchImage(imgEl, resultsId) {
+            // Store the selected image URL in a data attribute on the results container
+            const results = document.getElementById(resultsId);
+            results.querySelectorAll('img').forEach(i => i.style.border = '2px solid transparent');
+            imgEl.style.border = '2px solid #4CAF50';
+            results.dataset.selectedUrl = imgEl.src.replace('/200px-', '/400px-'); // Get larger version
+        }
+
         async function addSectionItem(sid) {
             const form = document.getElementById('add-item-form-'+sid);
             const prompt_text = form.querySelector('.item-prompt').value.trim();
             const answer = form.querySelector('.item-answer').value.trim();
             const priority = parseInt(form.querySelector('.item-priority').value) || 1;
             if (!answer) { alert('Answer is required'); return; }
-            const resp = await fetch(`${API_BASE}/sections/items/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sectionId:sid, prompt:prompt_text, answer, priority})});
+            // Handle image: upload file or use search selection
+            let image = null;
+            const fileInput = form.querySelector('.item-image-file');
+            const searchResults = document.getElementById('img-search-'+sid);
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+                const fname = sid + '_' + Date.now() + '.' + ext;
+                const resp = await fetch(`${API_BASE}/image/upload?name=${encodeURIComponent(fname)}`, { method: 'POST', body: file });
+                const d = await resp.json();
+                if (d.ok) image = d.path;
+            } else if (searchResults && searchResults.dataset.selectedUrl) {
+                image = searchResults.dataset.selectedUrl;
+            }
+            const resp = await fetch(`${API_BASE}/sections/items/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sectionId:sid, prompt:prompt_text, answer, priority, image})});
             const d = await resp.json();
             if (d.ok) { buildSectionItems(sid); form.style.display='none'; } else alert('Failed');
         }
@@ -980,20 +1033,24 @@
             if (!sec) return;
             const container = document.querySelector(`[data-section-items="${sid}"]`);
             if (!container) return;
-            let h='<table><thead><tr><th>#</th><th>Content</th><th>Audio</th><th></th></tr></thead><tbody>';
+            let h='<table><thead><tr><th>#</th><th></th><th>Content</th><th>Audio</th><th></th></tr></thead><tbody>';
             sec.items.forEach((item,i) => {
                 const escP = (item.prompt||'').replace(/'/g,"\\'");
                 const escA = (item.answer||'').replace(/'/g,"\\'");
+                const imgHtml = item.image ? `<img src="${item.image}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">` : '';
                 h+=`<tr>
                     <td rowspan="2" style="vertical-align:middle">${item.priority||i+1}</td>
+                    <td rowspan="2" style="vertical-align:middle">${imgHtml}</td>
                     <td class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="prompt" data-val="${escP}" style="direction:rtl;font-weight:700">${item.prompt||'-'}</td>
                     <td><span style="font-size:0.7rem;color:#888;margin-left:4px">Q</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/prompt_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/prompt_${item.id}.mp3',this)">🎙</button></span></td>
                     <td rowspan="2" style="vertical-align:middle;text-align:center">
+                        <button class="btn btn-claude" style="width:28px;height:28px;font-size:0.7rem" onclick="reqClaude('section-item',{sid:'${sid}',itemId:${item.id},sectionLabel:'${sec.label.replace(/'/g,"\\'")}',prompt:'${escP}',answer:'${escA}'})" title="Claude Code">🤖</button>
                         <button class="btn btn-del" style="width:28px;height:28px;font-size:0.7rem" onclick="deleteSectionItem('${sid}',${item.id})">🗑</button>
                     </td>
                 </tr>
                 <tr style="border-bottom:2px solid #ddd">
-                    <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="answer" data-val="${escA}">${item.answer}</span></td>
+                    <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="answer" data-val="${escA}">${item.answer}</span>
+                        <button class="btn btn-tok" style="width:22px;height:22px;font-size:0.6rem" onclick="toggleTokens(this,'${escA}','sec',0)">🔤</button></td>
                     <td><span style="font-size:0.7rem;color:#888;margin-left:4px">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/answer_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/answer_${item.id}.mp3',this)">🎙</button></span></td>
                 </tr>`;
             });
@@ -1037,12 +1094,22 @@
                             <option value="sequential" ${sec.ordering==='sequential'?'selected':''}>Sequential</option>
                         </select></label>
                     </div>
-                    <div style="margin:8px 0">
+                    <div style="margin:8px 0;display:flex;gap:6px">
                         <button onclick="document.getElementById('add-item-form-${sec.id}').style.display='block'" style="padding:4px 12px;border-radius:6px;border:1px solid #4CAF50;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-size:0.8rem;font-weight:700">+ Add Item</button>
+                        <button onclick="reqClaude('section-all',{sid:'${sec.id}',sectionLabel:'${sec.label.replace(/'/g,"\\'")}',items:${JSON.stringify(sec.items).replace(/'/g,"\\'")}})" style="padding:4px 12px;border-radius:6px;border:1px solid #9C27B0;background:#F3E5F5;color:#7B1FA2;cursor:pointer;font-size:0.8rem">🤖 Generate all audio</button>
                     </div>
                     <div id="add-item-form-${sec.id}" class="add-form" style="display:none">
                         <label>Prompt (Hebrew)</label><input class="item-prompt" placeholder="e.g. ?מה אומר כלב">
                         <label class="required">Answer with nikud</label><input class="item-answer" placeholder="e.g. כֶּלֶב">
+                        <label>Image (optional)</label>
+                        <div style="display:flex;gap:4px;margin-bottom:4px">
+                            <button type="button" onclick="this.nextElementSibling.style.display='';this.nextElementSibling.nextElementSibling.style.display='none'" style="padding:3px 10px;border-radius:4px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-size:0.8rem">📷 Upload</button>
+                            <div style="display:none"><input class="item-image-file" type="file" accept="image/*" style="font-size:0.8rem"></div>
+                            <div>
+                                <input class="item-image-search" placeholder="Search images..." style="width:150px;font-size:0.8rem;padding:3px 6px;border:1px solid #ddd;border-radius:4px" oninput="searchImages(this.value,'img-search-${sec.id}')">
+                            </div>
+                        </div>
+                        <div id="img-search-${sec.id}" style="display:none;max-height:150px;overflow-y:auto;border:1px solid #eee;border-radius:6px;margin-bottom:6px"></div>
                         <label>Priority/Order</label><input class="item-priority" type="number" value="1">
                         <div class="form-actions">
                             <button onclick="addSectionItem('${sec.id}')" style="background:#4CAF50;color:#fff">Add Item</button>

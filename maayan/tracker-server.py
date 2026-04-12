@@ -634,6 +634,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_state_load()
         elif path == '/fotmob/search':
             self._handle_fotmob_search()
+        elif path == '/image/search':
+            self._handle_image_search()
         else:
             self.send_response(404)
             self.end_headers()
@@ -657,6 +659,32 @@ class Handler(BaseHTTPRequestHandler):
         with open(target, 'wb') as f:
             f.write(data)
         self._respond_json({'ok': True, 'path': f'img/players/{filename}'})
+
+    def _handle_image_search(self):
+        """Proxy Wikimedia image search for finding free images."""
+        from urllib.parse import urlparse, parse_qs
+        qs = parse_qs(urlparse(self.path).query)
+        query = qs.get('q', [''])[0]
+        if not query:
+            self._respond_json([])
+            return
+        try:
+            url = f'https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={urllib.request.quote(query)}+filetype:bitmap&srnamespace=6&srlimit=12&format=json'
+            req = urllib.request.Request(url, headers={'User-Agent': 'NeriReadingGame/1.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+            results = []
+            for item in data.get('query', {}).get('search', []):
+                title = item.get('title', '')
+                fname = title.replace('File:', '')
+                # Build thumbnail URL from filename
+                import hashlib
+                md5 = hashlib.md5(fname.encode()).hexdigest()
+                thumb = f'https://upload.wikimedia.org/wikipedia/commons/thumb/{md5[0]}/{md5[0:2]}/{urllib.request.quote(fname)}/200px-{urllib.request.quote(fname)}'
+                results.append({'title': fname, 'thumb': thumb})
+            self._respond_json(results)
+        except:
+            self._respond_json([])
 
     def _handle_fotmob_search(self):
         """Proxy FotMob search API to avoid CORS issues."""
