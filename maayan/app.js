@@ -572,6 +572,12 @@ class Game {
         // Start activity tracking with identity
         if (window._startTracking) window._startTracking(identity);
 
+        // Apply theme based on identity
+        document.body.classList.remove('theme-hp', 'theme-animals', 'theme-sports');
+        if (identity === 'ofri') document.body.classList.add('theme-hp');
+        else if (identity === 'adam') document.body.classList.add('theme-animals');
+        else document.body.classList.add('theme-sports');
+
         // Hide start screen and begin
         this.dom.startScreen.classList.add('hidden');
         this.isAnimating = false;
@@ -593,8 +599,14 @@ class Game {
             this.dom.floatingDeco.appendChild(cloud);
         }
 
-        // Floating + static badges — all draggable (fewer on mobile)
-        const badgeSrcs = ['img/maccabi-netanya.png','img/israel-national.png'];
+        // Floating + static badges — themed per identity
+        const hpTheme = this.identity === 'ofri';
+        const animalTheme = this.identity === 'adam';
+        const badgeSrcs = hpTheme
+            ? ['img/hp-gryffindor.svg','img/hp-slytherin.svg','img/hp-ravenclaw.svg','img/hp-hufflepuff.svg']
+            : animalTheme
+            ? ['img/animal-paw.svg','img/animal-leaf.svg']
+            : ['img/maccabi-netanya.png','img/israel-national.png'];
         const badgeCount = window.innerWidth <= 600 ? 10 : 24;
         for (let i = 0; i < badgeCount; i++) {
             const src = badgeSrcs[i % badgeSrcs.length];
@@ -621,13 +633,17 @@ class Game {
             this.makeBadgeDraggable(el);
         }
 
-        // Two 3D goals on left and right edges, vertically centered
+        // Two goals on left and right edges — themed per identity
         this.goalScores = { left: 0, right: 0 };
         ['left', 'right'].forEach(side => {
             const goal = document.createElement('div');
             goal.className = 'badge-goal goal-' + side;
             goal.dataset.side = side;
-            goal.innerHTML = '<div class="goal-inner"><div class="goal-front-post"></div><div class="goal-front-top"></div><div class="goal-front-bottom"></div><div class="goal-net-side"></div><div class="goal-net-top"></div><div class="goal-net-bottom"></div><div class="goal-back-post"></div></div>';
+            if (hpTheme) {
+                goal.innerHTML = '<div class="goal-inner quidditch-hoop"><div style="width:40px;height:40px;border:4px solid #DAA520;border-radius:50%;margin:0 auto"></div><div style="width:4px;height:80px;background:linear-gradient(#DAA520,#8B6914);margin:0 auto"></div></div>';
+            } else {
+                goal.innerHTML = '<div class="goal-inner"><div class="goal-front-post"></div><div class="goal-front-top"></div><div class="goal-front-bottom"></div><div class="goal-net-side"></div><div class="goal-net-top"></div><div class="goal-net-bottom"></div><div class="goal-back-post"></div></div>';
+            }
             document.body.appendChild(goal);
             const score = document.createElement('div');
             score.className = 'goal-score score-' + side;

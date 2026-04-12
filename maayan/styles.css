@@ -18,6 +18,18 @@
     --font-display: 'Secular One', 'Rubik', sans-serif;
 }
 
+/* ===== Theme overrides ===== */
+body.theme-hp {
+    --sky-top: #1a0a2e;
+    --sky-bottom: #2d1b4e;
+    --grass: #1a1a2e;
+}
+body.theme-animals {
+    --sky-top: #87CEEB;
+    --sky-bottom: #90EE90;
+    --grass: #228B22;
+}
+
 /* ===== Reset & Base ===== */
 * {
     margin: 0;
