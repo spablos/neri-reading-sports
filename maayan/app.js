@@ -684,25 +684,41 @@ class Game {
             if (hpTheme) {
                 goal.innerHTML = '<div class="goal-inner quidditch-hoop"><div style="width:40px;height:40px;border:4px solid #DAA520;border-radius:50%;margin:0 auto"></div><div style="width:4px;height:80px;background:linear-gradient(#DAA520,#8B6914);margin:0 auto"></div></div>';
             } else if (animalTheme) {
-                // Hammock tied between tree trunks
+                // Detailed tree with hammock
+                const mirror = side === 'right' ? ' transform="scale(-1,1)" transform-origin="center"' : '';
                 goal.innerHTML = `<div class="goal-inner hammock-goal">
-                    <svg viewBox="0 0 50 200" style="width:100%;height:100%">
-                        <!-- Tree trunk -->
-                        <rect x="18" y="0" width="14" height="200" rx="5" fill="#5D4037"/>
-                        <rect x="20" y="0" width="3" height="200" fill="#4E342E" opacity="0.3"/>
-                        <!-- Foliage -->
-                        <ellipse cx="25" cy="15" rx="24" ry="22" fill="#2E7D32" opacity="0.7"/>
-                        <ellipse cx="25" cy="8" rx="18" ry="15" fill="#388E3C" opacity="0.6"/>
-                        <ellipse cx="20" cy="28" rx="12" ry="8" fill="#43A047" opacity="0.5"/>
-                        <!-- Hammock ropes -->
-                        <path d="M25,60 Q-5,100 10,130" stroke="#A1887F" stroke-width="2" fill="none"/>
-                        <path d="M25,60 Q55,100 40,130" stroke="#A1887F" stroke-width="2" fill="none"/>
-                        <!-- Hammock fabric -->
-                        <path d="M10,130 Q25,150 40,130" stroke="#FF8A65" stroke-width="3" fill="#FFAB91" opacity="0.7"/>
-                        <path d="M12,131 Q25,145 38,131" stroke="none" fill="#FFCC80" opacity="0.4"/>
-                        <!-- Branch marks on trunk -->
-                        <ellipse cx="30" cy="70" rx="6" ry="2" fill="#4E342E" opacity="0.3"/>
-                        <ellipse cx="17" cy="150" rx="5" ry="2" fill="#4E342E" opacity="0.3"/>
+                    <svg viewBox="0 0 60 220" style="width:100%;height:100%"${mirror}>
+                        <!-- Tree trunk with bark texture -->
+                        <rect x="22" y="0" width="16" height="220" rx="6" fill="#5D4037"/>
+                        <rect x="25" y="0" width="4" height="220" fill="#4E342E" opacity="0.3"/>
+                        <rect x="33" y="0" width="2" height="220" fill="#6D4C41" opacity="0.2"/>
+                        <!-- Bark knots -->
+                        <ellipse cx="30" cy="75" rx="5" ry="3" fill="#4E342E" opacity="0.4"/>
+                        <ellipse cx="28" cy="155" rx="4" ry="2.5" fill="#4E342E" opacity="0.3"/>
+                        <!-- Rich foliage layers -->
+                        <ellipse cx="30" cy="0" rx="30" ry="25" fill="#1B5E20" opacity="0.8"/>
+                        <ellipse cx="25" cy="8" rx="25" ry="20" fill="#2E7D32" opacity="0.7"/>
+                        <ellipse cx="35" cy="5" rx="22" ry="18" fill="#388E3C" opacity="0.6"/>
+                        <ellipse cx="20" cy="22" rx="15" ry="10" fill="#43A047" opacity="0.5"/>
+                        <ellipse cx="40" cy="18" rx="12" ry="8" fill="#4CAF50" opacity="0.4"/>
+                        <!-- Branch sticking out -->
+                        <line x1="30" y1="55" x2="55" y2="48" stroke="#5D4037" stroke-width="3" stroke-linecap="round"/>
+                        <ellipse cx="55" cy="45" rx="10" ry="8" fill="#388E3C" opacity="0.5"/>
+                        <!-- Hammock rope from branch -->
+                        <path d="M50,50 Q60,90 45,120" stroke="#8D6E63" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                        <path d="M50,50 Q30,85 35,120" stroke="#8D6E63" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                        <!-- Hammock net -->
+                        <path d="M35,120 Q42,140 45,120" stroke="#D4A76A" stroke-width="2" fill="#E8C98A" opacity="0.6"/>
+                        <path d="M36,121 Q42,135 44,121" stroke="none" fill="#F0D9A0" opacity="0.4"/>
+                        <!-- Cross-hatching on hammock -->
+                        <line x1="37" y1="122" x2="39" y2="132" stroke="#C4A060" stroke-width="0.5" opacity="0.5"/>
+                        <line x1="40" y1="121" x2="41" y2="134" stroke="#C4A060" stroke-width="0.5" opacity="0.5"/>
+                        <line x1="43" y1="122" x2="42" y2="132" stroke="#C4A060" stroke-width="0.5" opacity="0.5"/>
+                        <!-- Small bird on branch -->
+                        <circle cx="52" cy="44" r="2.5" fill="#FF7043" opacity="0.7"/>
+                        <polygon points="54.5,44 57,43.5 54.5,43" fill="#FF7043" opacity="0.7"/>
+                        <!-- Vine/ivy on trunk -->
+                        <path d="M28,90 Q22,100 28,110 Q34,120 28,130" stroke="#4CAF50" stroke-width="1" fill="none" opacity="0.4"/>
                     </svg>
                 </div>`;
             } else {
