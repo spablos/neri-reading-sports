@@ -684,15 +684,25 @@ class Game {
             if (hpTheme) {
                 goal.innerHTML = '<div class="goal-inner quidditch-hoop"><div style="width:40px;height:40px;border:4px solid #DAA520;border-radius:50%;margin:0 auto"></div><div style="width:4px;height:80px;background:linear-gradient(#DAA520,#8B6914);margin:0 auto"></div></div>';
             } else if (animalTheme) {
-                // Rope swing between two trees
-                goal.innerHTML = `<div class="goal-inner rope-swing">
-                    <svg viewBox="0 0 45 200" style="width:100%;height:100%">
-                        <rect x="18" y="0" width="10" height="200" rx="4" fill="#5D4037" opacity="0.7"/>
-                        <ellipse cx="23" cy="10" rx="20" ry="18" fill="#2E7D32" opacity="0.6"/>
-                        <ellipse cx="23" cy="25" rx="16" ry="12" fill="#388E3C" opacity="0.5"/>
-                        <path d="M23,40 Q5,80 15,120" stroke="#8D6E63" stroke-width="2" fill="none"/>
-                        <path d="M23,40 Q41,80 31,120" stroke="#8D6E63" stroke-width="2" fill="none"/>
-                        <rect x="10" y="118" width="26" height="4" rx="2" fill="#6D4C41"/>
+                // Hammock tied between tree trunks
+                goal.innerHTML = `<div class="goal-inner hammock-goal">
+                    <svg viewBox="0 0 50 200" style="width:100%;height:100%">
+                        <!-- Tree trunk -->
+                        <rect x="18" y="0" width="14" height="200" rx="5" fill="#5D4037"/>
+                        <rect x="20" y="0" width="3" height="200" fill="#4E342E" opacity="0.3"/>
+                        <!-- Foliage -->
+                        <ellipse cx="25" cy="15" rx="24" ry="22" fill="#2E7D32" opacity="0.7"/>
+                        <ellipse cx="25" cy="8" rx="18" ry="15" fill="#388E3C" opacity="0.6"/>
+                        <ellipse cx="20" cy="28" rx="12" ry="8" fill="#43A047" opacity="0.5"/>
+                        <!-- Hammock ropes -->
+                        <path d="M25,60 Q-5,100 10,130" stroke="#A1887F" stroke-width="2" fill="none"/>
+                        <path d="M25,60 Q55,100 40,130" stroke="#A1887F" stroke-width="2" fill="none"/>
+                        <!-- Hammock fabric -->
+                        <path d="M10,130 Q25,150 40,130" stroke="#FF8A65" stroke-width="3" fill="#FFAB91" opacity="0.7"/>
+                        <path d="M12,131 Q25,145 38,131" stroke="none" fill="#FFCC80" opacity="0.4"/>
+                        <!-- Branch marks on trunk -->
+                        <ellipse cx="30" cy="70" rx="6" ry="2" fill="#4E342E" opacity="0.3"/>
+                        <ellipse cx="17" cy="150" rx="5" ry="2" fill="#4E342E" opacity="0.3"/>
                     </svg>
                 </div>`;
             } else {
@@ -954,6 +964,17 @@ class Game {
         this.dom.questionCard.classList.remove('hidden');
         this.dom.questionEmoji.textContent = pool.section.emoji;
         this.dom.questionText.textContent = item.prompt || item.answer;
+        // Show item image if available
+        const qImg = document.getElementById('question-image');
+        if (qImg) {
+            if (item.image) {
+                qImg.src = item.image;
+                qImg.style.display = 'block';
+                qImg.onerror = () => { qImg.style.display = 'none'; };
+            } else {
+                qImg.style.display = 'none';
+            }
+        }
 
         // Tokenize the answer
         const answerTokens = HEBREW.tokenize(item.answer);
@@ -1029,6 +1050,8 @@ class Game {
         const emojis = { worldcup: '🏆', champions: '⚽', israel: '🇮🇱', nba: '🏀' };
         this.dom.questionEmoji.textContent = emojis[this.currentFact.category] || '🧠';
         this.dom.questionText.textContent = this.currentFact.q;
+        const qImg = document.getElementById('question-image');
+        if (qImg) qImg.style.display = 'none';
 
         // Tokenize the answer
         const answerTokens = HEBREW.tokenize(this.currentFact.a);
