@@ -94,6 +94,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_section_item_delete()
         elif path == '/state/save':
             self._handle_state_save()
+        elif path == '/config/save':
+            self._handle_config_save()
         elif path == '/image/upload':
             self._handle_image_upload()
         else:
@@ -636,9 +638,37 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_fotmob_search()
         elif path == '/image/search':
             self._handle_image_search()
+        elif path == '/config/load':
+            self._handle_config_load()
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_config_load(self):
+        cfile = os.path.join(STATE_DIR, 'app-config.json')
+        if os.path.exists(cfile):
+            try:
+                with open(cfile) as f:
+                    self._respond_json(json.load(f))
+                    return
+            except: pass
+        self._respond_json({})
+
+    def _handle_config_save(self):
+        data = self._read_body_json()
+        cfile = os.path.join(STATE_DIR, 'app-config.json')
+        os.makedirs(STATE_DIR, exist_ok=True)
+        # Merge with existing
+        config = {}
+        if os.path.exists(cfile):
+            try:
+                with open(cfile) as f:
+                    config = json.load(f)
+            except: pass
+        config.update(data)
+        with open(cfile, 'w') as f:
+            json.dump(config, f, ensure_ascii=False)
+        self._respond_json({'ok': True})
 
     def _handle_image_upload(self):
         """Accept image upload for player photos. Saves to img/players/{id}.jpg"""

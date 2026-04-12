@@ -1171,9 +1171,45 @@
             container.innerHTML=h;
         }
 
+        async function loadAppConfig() {
+            try { return await fetch(`${API_BASE}/config/load`).then(r=>r.json()); } catch(e) { return {}; }
+        }
+        async function saveBuiltinOverride(mode, uid, value) {
+            const config = await loadAppConfig();
+            if (!config.builtinOverrides) config.builtinOverrides = {};
+            if (!config.builtinOverrides[mode]) config.builtinOverrides[mode] = {};
+            config.builtinOverrides[mode][uid] = value === 'default' ? undefined : value;
+            // Clean up undefined values
+            if (config.builtinOverrides[mode][uid] === undefined) delete config.builtinOverrides[mode][uid];
+            if (Object.keys(config.builtinOverrides[mode]).length === 0) delete config.builtinOverrides[mode];
+            await fetch(`${API_BASE}/config/save`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({builtinOverrides: config.builtinOverrides})});
+        }
+
         async function buildCustomSectionsContent(el) {
             const sections = await loadSections();
-            let h = `<div class="toolbar"><button onclick="toggleAddSectionForm()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ New Section</button></div>
+            const config = await loadAppConfig();
+            const builtinOv = config.builtinOverrides || {};
+            let h = `<div style="background:#fff;border:2px solid #90CAF9;border-radius:12px;padding:12px;margin-bottom:12px">
+                <strong style="font-size:0.95rem">Built-in sections — per-user visibility</strong>
+                <div style="margin-top:6px">
+                ${['players','funfacts'].map(mode => {
+                    const modeLabel = mode === 'players' ? '⚽ Players' : '🧠 Fun Facts';
+                    const modeOv = builtinOv[mode] || {};
+                    return '<div style="margin:6px 0"><strong style="font-size:0.85rem">' + modeLabel + '</strong><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:3px">' +
+                        ['maayan','ofri','adam','boomerim'].map(uid => {
+                            const val = modeOv[uid] || 'default';
+                            return '<div style="border:1px solid #eee;border-radius:4px;padding:3px 6px;background:#fafafa;font-size:0.75rem">' +
+                                '<span style="font-weight:700">' + uid + '</span> ' +
+                                '<select onchange="saveBuiltinOverride(&quot;'+mode+'&quot;,&quot;'+uid+'&quot;,this.value)" style="padding:1px;font-size:0.7rem;border:1px solid #ddd;border-radius:3px">' +
+                                '<option value="default"' + (val==='default'?' selected':'') + '>Default</option>' +
+                                '<option value="show"' + (val==='show'?' selected':'') + '>Show</option>' +
+                                '<option value="hide"' + (val==='hide'?' selected':'') + '>Hide</option>' +
+                                '</select></div>';
+                        }).join('') + '</div></div>';
+                }).join('')}
+                </div>
+            </div>
+            <div class="toolbar"><button onclick="toggleAddSectionForm()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ New Section</button></div>
             <div class="add-form" id="add-section-form">
                 <label class="required">Section name (Hebrew)</label><input id="as-label" placeholder="e.g. חיות">
                 <label>Section icon</label>

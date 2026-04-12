@@ -357,6 +357,23 @@ class Game {
         this.funFactsUnlocked = saved.funFactsUnlocked || false;
     }
 
+    async loadAppConfig() {
+        try {
+            const resp = await fetch('/maayan/api/config/load');
+            this.appConfig = await resp.json();
+        } catch(_) { this.appConfig = {}; }
+    }
+
+    isBuiltinSectionVisible(mode) {
+        // Check per-identity override for built-in sections (players, funfacts)
+        const overrides = this.appConfig && this.appConfig.builtinOverrides;
+        if (!overrides || !overrides[mode]) return undefined; // no config = default behavior
+        const modeOv = overrides[mode][this.identity];
+        if (modeOv === 'hide') return false;
+        if (modeOv === 'show') return true;
+        return undefined; // 'default' = normal behavior
+    }
+
     init() {
         Speech.init();
         this.buildTitle();
@@ -426,9 +443,18 @@ class Game {
     }
 
     refreshSectionTabs() {
-        // Show/hide fun facts tab based on unlock state
+        // Show/hide players tab based on config
+        const pTab = this.dom.modeTabs.querySelector('[data-mode="players"]');
+        if (pTab) {
+            const pVis = this.isBuiltinSectionVisible('players');
+            pTab.style.display = pVis === false ? 'none' : '';
+        }
+        // Show/hide fun facts tab based on unlock state + config
         const ffTab = this.dom.modeTabs.querySelector('[data-mode="funfacts"]');
-        if (ffTab) ffTab.style.display = this.funFactsUnlocked ? '' : 'none';
+        if (ffTab) {
+            const ffVis = this.isBuiltinSectionVisible('funfacts');
+            ffTab.style.display = ffVis === false ? 'none' : (this.funFactsUnlocked ? '' : 'none');
+        }
 
         if (typeof CUSTOM_SECTIONS === 'undefined') return;
         let hasVisible = false;
@@ -566,12 +592,19 @@ class Game {
             this.audioPlayer.currentTime = 0;
         }).catch(() => {});
 
-        // Load state from server, fallback to localStorage
+        // Load config and state
+        await this.loadAppConfig();
         await this.loadState();
 
         // Update displayed score and UI
         this.dom.scoreValue.textContent = this.score;
         this.setupModeTabs();
+
+        // If players is hidden for this identity, switch to first visible section
+        if (this.isBuiltinSectionVisible('players') === false) {
+            const firstVisibleTab = this.dom.modeTabs.querySelector('.mode-tab:not([style*="display: none"])');
+            if (firstVisibleTab) this.mode = firstVisibleTab.dataset.mode;
+        }
 
         // Start activity tracking with identity
         if (window._startTracking) window._startTracking(identity);
