@@ -25,9 +25,13 @@ body.theme-hp {
     --grass: #1a1a2e;
 }
 body.theme-animals {
-    --sky-top: #87CEEB;
-    --sky-bottom: #90EE90;
-    --grass: #228B22;
+    --sky-top: #4a7c59;
+    --sky-bottom: #2d5a27;
+    --grass: #1a3d12;
+    background-image:
+        radial-gradient(ellipse at 10% 90%, rgba(34,139,34,0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 85%, rgba(34,139,34,0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(0,100,0,0.4) 0%, transparent 40%);
 }
 
 /* ===== Reset & Base ===== */

@@ -642,9 +642,12 @@ class Game {
         const hpTheme = this.identity === 'ofri';
         const animalTheme = this.identity === 'adam';
         const badgeSrcs = hpTheme
-            ? ['img/hp-gryffindor.svg','img/hp-slytherin.svg','img/hp-ravenclaw.svg','img/hp-hufflepuff.svg']
+            ? ['img/hp-gryffindor.svg','img/hp-slytherin.svg','img/hp-ravenclaw.svg','img/hp-hufflepuff.svg',
+               'img/hp-wand.svg','img/hp-hat.svg','img/hp-snitch.svg','img/hp-potion.svg',
+               'img/hp-broom.svg','img/hp-owl.svg','img/hp-lightning.svg','img/hp-castle.svg']
             : animalTheme
-            ? ['img/animal-paw.svg','img/animal-leaf.svg']
+            ? ['img/animal-paw.svg','img/animal-leaf.svg','img/nature-tree.svg','img/nature-butterfly.svg',
+               'img/nature-flower.svg','img/nature-bird.svg','img/nature-mushroom.svg','img/nature-frog.svg']
             : ['img/maccabi-netanya.png','img/israel-national.png'];
         const badgeCount = window.innerWidth <= 600 ? 10 : 24;
         for (let i = 0; i < badgeCount; i++) {
@@ -680,6 +683,18 @@ class Game {
             goal.dataset.side = side;
             if (hpTheme) {
                 goal.innerHTML = '<div class="goal-inner quidditch-hoop"><div style="width:40px;height:40px;border:4px solid #DAA520;border-radius:50%;margin:0 auto"></div><div style="width:4px;height:80px;background:linear-gradient(#DAA520,#8B6914);margin:0 auto"></div></div>';
+            } else if (animalTheme) {
+                // Rope swing between two trees
+                goal.innerHTML = `<div class="goal-inner rope-swing">
+                    <svg viewBox="0 0 45 200" style="width:100%;height:100%">
+                        <rect x="18" y="0" width="10" height="200" rx="4" fill="#5D4037" opacity="0.7"/>
+                        <ellipse cx="23" cy="10" rx="20" ry="18" fill="#2E7D32" opacity="0.6"/>
+                        <ellipse cx="23" cy="25" rx="16" ry="12" fill="#388E3C" opacity="0.5"/>
+                        <path d="M23,40 Q5,80 15,120" stroke="#8D6E63" stroke-width="2" fill="none"/>
+                        <path d="M23,40 Q41,80 31,120" stroke="#8D6E63" stroke-width="2" fill="none"/>
+                        <rect x="10" y="118" width="26" height="4" rx="2" fill="#6D4C41"/>
+                    </svg>
+                </div>`;
             } else {
                 goal.innerHTML = '<div class="goal-inner"><div class="goal-front-post"></div><div class="goal-front-top"></div><div class="goal-front-bottom"></div><div class="goal-net-side"></div><div class="goal-net-top"></div><div class="goal-net-bottom"></div><div class="goal-back-post"></div></div>';
             }
