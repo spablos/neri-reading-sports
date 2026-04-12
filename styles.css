@@ -754,6 +754,12 @@ body {
     position: relative;
 }
 
+.drop-zone-word {
+    display: flex;
+    gap: inherit;
+    flex-shrink: 0;
+}
+
 .drop-zone-gap {
     width: clamp(16px, 3vw, 28px);
     height: clamp(62px, 14vw, 90px);

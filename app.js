@@ -762,24 +762,8 @@ class Game {
             if (tok !== ' ') { soundByNameIdx[ni] = syllableSounds[li++]; }
         });
 
-        // Build drop zones (RTL: first token = rightmost)
-        // Space tokens become visual gaps (pre-filled, non-interactive)
-        this.dom.dropZonesEl.innerHTML = '';
-        this.dropZones = [];
-        nameTokens.forEach((tok, i) => {
-            if (tok === ' ') {
-                const gap = document.createElement('div');
-                gap.className = 'drop-zone-gap';
-                this.dom.dropZonesEl.appendChild(gap);
-                // no entry in this.dropZones — gap is non-interactive
-            } else {
-                const dz = document.createElement('div');
-                dz.className = 'drop-zone';
-                dz.dataset.index = i;
-                this.dom.dropZonesEl.appendChild(dz);
-                this.dropZones.push({ element: dz, index: i, expected: tok, filled: false });
-            }
-        });
+        // Build drop zones grouped by word (so flex-wrap only breaks between words)
+        this.buildDropZones(nameTokens);
 
         // Build draggable tokens (only letter tokens, not spaces)
         this.dom.tokensContainer.innerHTML = '';
@@ -871,22 +855,8 @@ class Game {
             if (tok !== ' ') { soundByIdx[ni] = syllableSounds[li++]; }
         });
 
-        // Build drop zones
-        this.dom.dropZonesEl.innerHTML = '';
-        this.dropZones = [];
-        answerTokens.forEach((tok, i) => {
-            if (tok === ' ') {
-                const gap = document.createElement('div');
-                gap.className = 'drop-zone-gap';
-                this.dom.dropZonesEl.appendChild(gap);
-            } else {
-                const dz = document.createElement('div');
-                dz.className = 'drop-zone';
-                dz.dataset.index = i;
-                this.dom.dropZonesEl.appendChild(dz);
-                this.dropZones.push({ element: dz, index: i, expected: tok, filled: false });
-            }
-        });
+        // Build drop zones grouped by word
+        this.buildDropZones(answerTokens);
 
         // Build tokens
         this.dom.tokensContainer.innerHTML = '';
@@ -980,6 +950,31 @@ class Game {
             window.speechSynthesis.cancel();
         }
         this._playingBtn = null;
+    }
+
+    // ===== Build drop zones grouped by word (prevents mid-word line breaks) =====
+    buildDropZones(tokens) {
+        this.dom.dropZonesEl.innerHTML = '';
+        this.dropZones = [];
+        let wordGroup = document.createElement('div');
+        wordGroup.className = 'drop-zone-word';
+        tokens.forEach((tok, i) => {
+            if (tok === ' ') {
+                if (wordGroup.childElementCount) this.dom.dropZonesEl.appendChild(wordGroup);
+                const gap = document.createElement('div');
+                gap.className = 'drop-zone-gap';
+                this.dom.dropZonesEl.appendChild(gap);
+                wordGroup = document.createElement('div');
+                wordGroup.className = 'drop-zone-word';
+            } else {
+                const dz = document.createElement('div');
+                dz.className = 'drop-zone';
+                dz.dataset.index = i;
+                wordGroup.appendChild(dz);
+                this.dropZones.push({ element: dz, index: i, expected: tok, filled: false });
+            }
+        });
+        if (wordGroup.childElementCount) this.dom.dropZonesEl.appendChild(wordGroup);
     }
 
     // ===== Scatter tokens across the screen, avoiding all UI elements =====
