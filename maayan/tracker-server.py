@@ -826,6 +826,7 @@ class Handler(BaseHTTPRequestHandler):
                 if 'adminOverride' in data: sec['adminOverride'] = data['adminOverride'] if data['adminOverride'] != 'auto' else None
                 if 'ordering' in data: sec['ordering'] = data['ordering']
                 if 'activityType' in data: sec['activityType'] = data['activityType']
+                if 'identityOverrides' in data: sec['identityOverrides'] = data['identityOverrides']
                 self._write_sections(sections)
                 self._respond_json({'ok': True})
                 return

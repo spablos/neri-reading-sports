@@ -416,9 +416,13 @@ class Game {
     }
 
     isSectionVisible(sec) {
-        if (sec.adminOverride === 'show') return true;
-        if (sec.adminOverride === 'hide') return false;
-        return this.score >= (sec.threshold || 0);
+        // Per-identity override takes priority
+        const idOv = sec.identityOverrides && sec.identityOverrides[this.identity];
+        const override = idOv && idOv.adminOverride !== undefined ? idOv.adminOverride : sec.adminOverride;
+        const threshold = idOv && idOv.threshold !== undefined ? idOv.threshold : (sec.threshold || 0);
+        if (override === 'show') return true;
+        if (override === 'hide') return false;
+        return this.score >= threshold;
     }
 
     refreshSectionTabs() {

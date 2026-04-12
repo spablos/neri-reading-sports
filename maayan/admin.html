@@ -1037,6 +1037,21 @@
             const body = {id: sid}; body[field] = value;
             await fetch(`${API_BASE}/sections/edit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
         }
+        async function editIdentityOverride(sid, uid, field, value) {
+            // Fetch current section, update the identityOverrides, save back
+            const sections = await loadSections();
+            const sec = sections.find(s => s.id === sid);
+            if (!sec) return;
+            const overrides = sec.identityOverrides || {};
+            if (!overrides[uid]) overrides[uid] = {};
+            if (value === 'default' || value === '') {
+                delete overrides[uid][field];
+                if (Object.keys(overrides[uid]).length === 0) delete overrides[uid];
+            } else {
+                overrides[uid][field] = field === 'threshold' ? parseInt(value) : (value === 'auto' ? null : value);
+            }
+            await fetch(`${API_BASE}/sections/edit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: sid, identityOverrides: overrides})});
+        }
         // ===== Image search (Wikimedia Commons) =====
         let _imgTimer = null;
         function searchImages(query, resultsId) {
@@ -1224,6 +1239,26 @@
                             <option value="trace" ${sec.activityType==='trace'?'selected':''}>Letter Tracing</option>
                         </select></label>
                     </div>
+                    <details style="margin-bottom:8px;font-size:0.8rem">
+                        <summary style="cursor:pointer;color:#666;font-weight:700">Per-user visibility</summary>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;padding:6px;background:#fafafa;border-radius:6px">
+                        ${['maayan','ofri','adam','boomerim'].map(uid => {
+                            const idOv = (sec.identityOverrides||{})[uid] || {};
+                            const idVis = idOv.adminOverride !== undefined ? idOv.adminOverride || 'auto' : 'default';
+                            const idThr = idOv.threshold !== undefined ? idOv.threshold : '';
+                            return '<div style="border:1px solid #eee;border-radius:6px;padding:4px 8px;background:#fff">' +
+                                '<div style="font-weight:700;margin-bottom:2px">' + uid + '</div>' +
+                                '<select onchange="editIdentityOverride(\\''+sec.id+'\\',\\''+uid+'\\',\\'adminOverride\\',this.value)" style="padding:2px;font-size:0.75rem;border:1px solid #ddd;border-radius:3px">' +
+                                '<option value="default"' + (idVis==='default'?' selected':'') + '>Default</option>' +
+                                '<option value="auto"' + (idVis==='auto'?' selected':'') + '>Auto</option>' +
+                                '<option value="show"' + (idVis==='show'?' selected':'') + '>Show</option>' +
+                                '<option value="hide"' + (idVis==='hide'?' selected':'') + '>Hide</option>' +
+                                '</select> ' +
+                                '<input type="number" placeholder="Thr" value="' + idThr + '" style="width:45px;padding:2px;font-size:0.75rem;border:1px solid #ddd;border-radius:3px" onchange="editIdentityOverride(\\''+sec.id+'\\',\\''+uid+'\\',\\'threshold\\',this.value)">' +
+                                '</div>';
+                        }).join('')}
+                        </div>
+                    </details>
                     <div style="margin:8px 0;display:flex;gap:6px">
                         <button onclick="document.getElementById('add-item-form-${sec.id}').style.display='block'" style="padding:4px 12px;border-radius:6px;border:1px solid #4CAF50;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-size:0.8rem;font-weight:700">+ Add Item</button>
                         <button onclick="reqClaude('section-all',{sid:'${sec.id}',sectionLabel:'${sec.label.replace(/'/g,"\\'")}',items:${JSON.stringify(sec.items).replace(/'/g,"\\'")}})" style="padding:4px 12px;border-radius:6px;border:1px solid #9C27B0;background:#F3E5F5;color:#7B1FA2;cursor:pointer;font-size:0.8rem">🤖 Generate all audio</button>
