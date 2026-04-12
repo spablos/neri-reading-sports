@@ -1133,8 +1133,8 @@ class Game {
             zone.ctx.scale(dpr, dpr);
             zone.ctx.lineCap = 'round';
             zone.ctx.lineJoin = 'round';
-            zone.ctx.lineWidth = Math.max(4, w * 0.08);
-            zone.ctx.strokeStyle = '#4CAF50';
+            zone.ctx.lineWidth = Math.max(2, w * 0.03);
+            zone.ctx.strokeStyle = '#7B1FA2';
 
             // Create reference mask
             zone.maskCanvas = document.createElement('canvas');
@@ -1254,7 +1254,7 @@ class Game {
         nextZone.ctx.font = `900 ${cs.fontSize} ${cs.fontFamily}`;
         nextZone.ctx.textAlign = 'center';
         nextZone.ctx.textBaseline = 'middle';
-        nextZone.ctx.fillStyle = '#4CAF50';
+        nextZone.ctx.fillStyle = '#7B1FA2';
         nextZone.ctx.fillText(nextZone.expected, nextZone.w / 2, nextZone.h / 2);
         nextZone.ctx.restore();
         this.handleTraceComplete(nextZone);
