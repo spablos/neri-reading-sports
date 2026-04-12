@@ -550,8 +550,9 @@ class Game {
         // Floating + static sports badges — all draggable
         const badgeSrcs = ['img/maccabi-fc.png','img/argentina-afa.png','img/maccabi-bc.png','img/argentina-flag.png'];
         const badges = [];
-        // Create 24 badges spread across the screen
-        for (let i = 0; i < 24; i++) {
+        // Fewer badges on mobile to reduce clutter
+        const badgeCount = window.innerWidth <= 600 ? 10 : 24;
+        for (let i = 0; i < badgeCount; i++) {
             const src = badgeSrcs[i % badgeSrcs.length];
             const size = randomBetween(35, 70);
             const el = document.createElement('div');
@@ -1007,6 +1008,7 @@ class Game {
         addExcl(document.getElementById('name-area'));       // drop zones row
         addExcl(document.getElementById('title-bar'));       // title + mode tabs
         addExcl(document.getElementById('score-panel'));     // score
+        document.querySelectorAll('.badge-goal').forEach(g => addExcl(g)); // side goals
 
         // Check if a candidate position overlaps any exclusion rect
         const hitsExclusion = (x, y) => exclusions.some(e =>

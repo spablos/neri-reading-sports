@@ -1452,6 +1452,22 @@ body {
     }
     .milestone-icon { font-size: clamp(3rem, 12vw, 5rem); }
     .milestone-text { font-size: clamp(1.1rem, 4vw, 1.8rem); }
+
+    /* Shrink goals on mobile so they don't eat screen space */
+    .badge-goal {
+        width: 45px;
+        height: 120px;
+    }
+    .goal-score {
+        width: 45px;
+        font-size: 0.85rem;
+    }
+
+    /* Smaller floating badges on mobile */
+    .sports-float {
+        max-width: 30px !important;
+        max-height: 30px !important;
+    }
 }
 
 /* ===== Responsive — Small phones (< 380px) ===== */

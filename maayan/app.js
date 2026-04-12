@@ -518,9 +518,10 @@ class Game {
             this.dom.floatingDeco.appendChild(cloud);
         }
 
-        // Floating + static badges — all draggable
+        // Floating + static badges — all draggable (fewer on mobile)
         const badgeSrcs = ['img/maccabi-netanya.png','img/israel-national.png'];
-        for (let i = 0; i < 24; i++) {
+        const badgeCount = window.innerWidth <= 600 ? 10 : 24;
+        for (let i = 0; i < badgeCount; i++) {
             const src = badgeSrcs[i % badgeSrcs.length];
             const size = randomBetween(35, 70);
             const el = document.createElement('div');
@@ -970,6 +971,7 @@ class Game {
         addExcl(document.getElementById('name-area'));       // drop zones row
         addExcl(document.getElementById('title-bar'));       // title + mode tabs
         addExcl(document.getElementById('score-panel'));     // score
+        document.querySelectorAll('.badge-goal').forEach(g => addExcl(g)); // side goals
 
         // Check if a candidate position overlaps any exclusion rect
         const hitsExclusion = (x, y) => exclusions.some(e =>
