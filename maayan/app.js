@@ -378,7 +378,6 @@ class Game {
         Speech.init();
         this.buildTitle();
         this.buildStartScreen();
-        this.createClouds();
         this.setupGlobalListeners();
         this.setupModeTabs();
 
@@ -614,6 +613,9 @@ class Game {
         if (identity === 'ofri') document.body.classList.add('theme-hp');
         else if (identity === 'adam') document.body.classList.add('theme-animals');
         else document.body.classList.add('theme-sports');
+
+        // Create themed decorations (badges, goals) now that identity is known
+        this.createClouds();
 
         // Hide start screen and begin
         this.dom.startScreen.classList.add('hidden');
