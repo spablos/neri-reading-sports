@@ -546,7 +546,7 @@ class Game {
         this.identity = identity;
 
         // Show identity badge
-        const idNames = { maayan: 'מעין', ofri: 'אופרי', boomerim: 'בומרים' };
+        const idNames = { maayan: 'מעין', ofri: 'עפרי', adam: 'אדם', boomerim: 'בומרים' };
         const badge = document.getElementById('identity-badge');
         badge.textContent = idNames[identity] || identity;
         badge.classList.remove('hidden');

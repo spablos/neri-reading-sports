@@ -724,7 +724,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         identity = data.get('identity', 'maayan')
-        if identity not in ('maayan', 'ofri', 'boomerim'):
+        if identity not in ('maayan', 'ofri', 'adam', 'boomerim'):
             self._respond_json({'ok': False, 'error': 'invalid identity'})
             return
         state = data.get('state', {})
@@ -738,7 +738,7 @@ class Handler(BaseHTTPRequestHandler):
         from urllib.parse import urlparse, parse_qs
         qs = parse_qs(urlparse(self.path).query)
         identity = qs.get('identity', ['maayan'])[0]
-        if identity not in ('maayan', 'ofri', 'boomerim'):
+        if identity not in ('maayan', 'ofri', 'adam', 'boomerim'):
             self._respond_json({})
             return
         state_file = os.path.join(STATE_DIR, f'state-{identity}.json')

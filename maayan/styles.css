@@ -1414,6 +1414,13 @@ body {
     background: linear-gradient(145deg, #66BB6A, #388E3C);
 }
 
+.identity-btn.identity-side {
+    font-size: clamp(0.9rem, 3vw, 1.3rem);
+    padding: 10px 20px;
+    opacity: 0.7;
+    margin-top: 8px;
+}
+
 #start-btn {
     font-family: var(--font-display);
     font-size: clamp(1.5rem, 5vw, 2.5rem);
