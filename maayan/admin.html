@@ -45,7 +45,32 @@
     </style>
 </head>
 <body>
-    <h1>Back Office — מעין לומד לקרוא</h1>
+    <h1 style="display:flex;align-items:center;justify-content:center;gap:10px">
+        Back Office — מעין לומד לקרוא
+        <button onclick="document.getElementById('admin-help').style.display=document.getElementById('admin-help').style.display==='none'?'block':'none'" style="background:none;border:2px solid #1976D2;border-radius:50%;width:30px;height:30px;font-size:1rem;cursor:pointer;color:#1976D2;padding:0;line-height:1">?</button>
+    </h1>
+    <div id="admin-help" style="display:none;max-width:700px;margin:0 auto 16px;background:#E3F2FD;border:2px solid #90CAF9;border-radius:12px;padding:16px;font-size:0.85rem;line-height:1.6;color:#333;direction:ltr;text-align:left">
+        <h3 style="margin:0 0 8px;color:#1976D2">Admin Help</h3>
+        <p><b>Sections:</b> The game has built-in sections (Players, Fun Facts) and custom sections you create. Each section contains items that the child spells by dragging letters or tracing.</p>
+        <p><b>Visibility per user:</b></p>
+        <ul style="margin:4px 0 8px 20px">
+            <li><b>Default</b> — Players: always visible. Fun Facts: hidden until unlocked (triple-tap on score in the game).</li>
+            <li><b>Show</b> — Force the section to always be visible for that user.</li>
+            <li><b>Hide</b> — Force the section to never be visible for that user.</li>
+        </ul>
+        <p><b>Custom section visibility:</b></p>
+        <ul style="margin:4px 0 8px 20px">
+            <li><b>Default / Auto</b> — Section appears when the user's score reaches the threshold.</li>
+            <li><b>Threshold</b> — Score needed to unlock the section (0 = immediate). Can be overridden per user.</li>
+        </ul>
+        <p><b>Activity types:</b></p>
+        <ul style="margin:4px 0 8px 20px">
+            <li><b>Drag & Drop</b> — Child drags letter balls to the correct drop zones.</li>
+            <li><b>Letter Tracing</b> — Child traces over ghost letters with their finger/pencil.</li>
+        </ul>
+        <p><b>Ordering:</b> Random = shuffled each cycle. Sequential = items appear in priority order.</p>
+        <p><b>Audio:</b> Use 🎙 to record, ▶ to play. Use 🔤 to expand syllable recording. Use 🤖 to copy a Claude Code prompt for generating audio.</p>
+    </div>
     <div style="text-align:center;margin-bottom:12px">
         <button onclick="clearAllAndReload()" style="padding:8px 20px;border-radius:8px;border:2px solid #d32f2f;background:#FFEBEE;color:#d32f2f;cursor:pointer;font-size:0.85rem;font-weight:700">🔄 Clear Cache & Reload</button>
         <span id="cache-status" style="font-size:0.75rem;color:#888;margin-right:8px"></span>
@@ -1191,18 +1216,6 @@
             const builtinOv = config.builtinOverrides || {};
             let h = `<div style="background:#fff;border:2px solid #90CAF9;border-radius:12px;padding:12px;margin-bottom:12px">
                 <strong style="font-size:0.95rem">Built-in sections — per-user visibility</strong>
-                <span onclick="document.getElementById('visibility-help').classList.toggle('hidden')" style="cursor:pointer;font-size:0.9rem;margin-right:4px" title="Help">❓</span>
-                <div id="visibility-help" class="hidden" style="background:#E3F2FD;border-radius:8px;padding:10px;margin-top:6px;font-size:0.8rem;line-height:1.5;color:#333">
-                    <strong>Visibility options:</strong><br>
-                    <b>Default</b> — Players: always visible. Fun Facts: hidden until unlocked (triple-tap on score).<br>
-                    <b>Show</b> — Force visible regardless of any rules.<br>
-                    <b>Hide</b> — Force hidden regardless of any rules.<br><br>
-                    <strong>Custom sections:</strong><br>
-                    <b>Default / Auto</b> — Section appears when the user's score reaches the threshold set on the section.<br>
-                    <b>Show</b> — Always visible regardless of score.<br>
-                    <b>Hide</b> — Never visible regardless of score.<br>
-                    <b>Custom threshold</b> — The number field overrides the section's threshold for that specific user.
-                </div>
                 <div style="margin-top:6px">
                 ${['players','funfacts'].map(mode => {
                     const modeLabel = mode === 'players' ? '⚽ Players' : '🧠 Fun Facts';
