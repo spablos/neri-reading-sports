@@ -13,6 +13,7 @@ const CORE_FILES = [
     '/maayan/manifest.json',
     '/maayan/icon-192.png',
     '/maayan/icon-512.png',
+    '/maayan/sections.js',
 ];
 
 // Install: cache core files immediately

@@ -80,6 +80,18 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_player_edit()
         elif path == '/funfacts/edit':
             self._handle_funfact_edit()
+        elif path == '/sections/add':
+            self._handle_section_add()
+        elif path == '/sections/edit':
+            self._handle_section_edit()
+        elif path == '/sections/delete':
+            self._handle_section_delete()
+        elif path == '/sections/items/add':
+            self._handle_section_item_add()
+        elif path == '/sections/items/edit':
+            self._handle_section_item_edit()
+        elif path == '/sections/items/delete':
+            self._handle_section_item_delete()
         elif path == '/state/save':
             self._handle_state_save()
         else:
@@ -614,6 +626,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_praise_texts()
         elif path == '/milestones':
             self._handle_milestones()
+        elif path == '/sections/list':
+            self._handle_sections_list()
         elif path == '/state/load':
             self._handle_state_load()
         else:
@@ -647,6 +661,174 @@ class Handler(BaseHTTPRequestHandler):
             except:
                 pass
         self._respond_json({})
+
+    def _read_sections(self):
+        """Read CUSTOM_SECTIONS from sections.js"""
+        sfile = os.path.join(WEB_ROOT, 'sections.js')
+        if not os.path.exists(sfile):
+            return []
+        with open(sfile, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # Extract JSON from "const CUSTOM_SECTIONS = [...];"
+        import re
+        m = re.search(r'const CUSTOM_SECTIONS\s*=\s*(\[.*\]);', content, re.DOTALL)
+        if not m:
+            return []
+        try:
+            return json.loads(m.group(1))
+        except:
+            return []
+
+    def _write_sections(self, sections):
+        """Write CUSTOM_SECTIONS to sections.js"""
+        sfile = os.path.join(WEB_ROOT, 'sections.js')
+        content = '// sections.js \u2014 Custom reading sections (auto-generated via admin)\n'
+        content += 'const CUSTOM_SECTIONS = ' + json.dumps(sections, ensure_ascii=False, indent=2) + ';\n'
+        with open(sfile, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    def _handle_sections_list(self):
+        """GET: return all custom sections"""
+        self._respond_json(self._read_sections())
+
+    def _handle_section_add(self):
+        """POST: create a new section"""
+        data = self._read_body_json()
+        label = data.get('label', '')
+        emoji = data.get('emoji', '')
+        if not label:
+            self._respond_json({'ok': False, 'error': 'missing label'})
+            return
+        sections = self._read_sections()
+        # Generate ID from label (transliterate or use timestamp)
+        import re as _re
+        sid = _re.sub(r'[^a-zA-Z0-9]', '', data.get('id', '')) or ('sec_' + str(int(datetime.datetime.now().timestamp())))
+        # Check uniqueness
+        if any(s['id'] == sid for s in sections):
+            sid = sid + '_' + str(len(sections))
+        section = {
+            'id': sid,
+            'label': label,
+            'emoji': emoji or '\U0001f4d6',
+            'threshold': int(data.get('threshold', 0)),
+            'adminOverride': data.get('adminOverride', None),
+            'ordering': data.get('ordering', 'random'),
+            'items': []
+        }
+        sections.append(section)
+        self._write_sections(sections)
+        self._respond_json({'ok': True, 'id': sid})
+
+    def _handle_section_edit(self):
+        """POST: edit section metadata"""
+        data = self._read_body_json()
+        sid = data.get('id', '')
+        if not sid:
+            self._respond_json({'ok': False, 'error': 'missing id'})
+            return
+        sections = self._read_sections()
+        for sec in sections:
+            if sec['id'] == sid:
+                if 'label' in data: sec['label'] = data['label']
+                if 'emoji' in data: sec['emoji'] = data['emoji']
+                if 'threshold' in data: sec['threshold'] = int(data['threshold'])
+                if 'adminOverride' in data: sec['adminOverride'] = data['adminOverride'] if data['adminOverride'] != 'auto' else None
+                if 'ordering' in data: sec['ordering'] = data['ordering']
+                self._write_sections(sections)
+                self._respond_json({'ok': True})
+                return
+        self._respond_json({'ok': False, 'error': 'section not found'})
+
+    def _handle_section_delete(self):
+        """POST: delete a section and its audio files"""
+        data = self._read_body_json()
+        sid = data.get('id', '')
+        if not sid:
+            self._respond_json({'ok': False, 'error': 'missing id'})
+            return
+        sections = self._read_sections()
+        sections = [s for s in sections if s['id'] != sid]
+        self._write_sections(sections)
+        # Clean up audio directory
+        import shutil
+        audio_dir = os.path.join(AUDIO_ROOT, 'sections', sid)
+        if os.path.isdir(audio_dir):
+            shutil.rmtree(audio_dir, ignore_errors=True)
+        self._respond_json({'ok': True})
+
+    def _handle_section_item_add(self):
+        """POST: add an item to a section"""
+        data = self._read_body_json()
+        sid = data.get('sectionId', '')
+        prompt = data.get('prompt', '')
+        answer = data.get('answer', '')
+        if not sid or not answer:
+            self._respond_json({'ok': False, 'error': 'missing fields'})
+            return
+        sections = self._read_sections()
+        for sec in sections:
+            if sec['id'] == sid:
+                # Generate next item ID
+                existing_ids = [item.get('id', 0) for item in sec['items']]
+                next_id = max(existing_ids, default=0) + 1
+                item = {
+                    'id': next_id,
+                    'prompt': prompt,
+                    'answer': answer,
+                    'image': data.get('image', None),
+                    'priority': int(data.get('priority', next_id)),
+                }
+                sec['items'].append(item)
+                self._write_sections(sections)
+                self._respond_json({'ok': True, 'itemId': next_id})
+                return
+        self._respond_json({'ok': False, 'error': 'section not found'})
+
+    def _handle_section_item_edit(self):
+        """POST: edit an item in a section"""
+        data = self._read_body_json()
+        sid = data.get('sectionId', '')
+        item_id = data.get('itemId', -1)
+        if not sid or item_id < 0:
+            self._respond_json({'ok': False, 'error': 'missing fields'})
+            return
+        sections = self._read_sections()
+        for sec in sections:
+            if sec['id'] == sid:
+                for item in sec['items']:
+                    if item['id'] == item_id:
+                        if 'prompt' in data: item['prompt'] = data['prompt']
+                        if 'answer' in data: item['answer'] = data['answer']
+                        if 'image' in data: item['image'] = data['image']
+                        if 'priority' in data: item['priority'] = int(data['priority'])
+                        self._write_sections(sections)
+                        self._respond_json({'ok': True})
+                        return
+                self._respond_json({'ok': False, 'error': 'item not found'})
+                return
+        self._respond_json({'ok': False, 'error': 'section not found'})
+
+    def _handle_section_item_delete(self):
+        """POST: delete an item from a section"""
+        data = self._read_body_json()
+        sid = data.get('sectionId', '')
+        item_id = data.get('itemId', -1)
+        if not sid or item_id < 0:
+            self._respond_json({'ok': False, 'error': 'missing fields'})
+            return
+        sections = self._read_sections()
+        for sec in sections:
+            if sec['id'] == sid:
+                sec['items'] = [it for it in sec['items'] if it['id'] != item_id]
+                self._write_sections(sections)
+                # Clean up audio files
+                for prefix in ['prompt', 'answer']:
+                    fpath = os.path.join(AUDIO_ROOT, 'sections', sid, f'{prefix}_{item_id}.mp3')
+                    if os.path.exists(fpath):
+                        os.remove(fpath)
+                self._respond_json({'ok': True})
+                return
+        self._respond_json({'ok': False, 'error': 'section not found'})
 
     def log_message(self, format, *args):
         pass

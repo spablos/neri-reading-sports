@@ -74,7 +74,7 @@
     <script>
     // Cache-bust: load data files with timestamp to always get fresh data
     const _t = Date.now();
-    ['players.js','descriptions.js','funfacts.js','hebrew.js'].forEach(f => {
+    ['players.js','descriptions.js','funfacts.js','hebrew.js','sections.js'].forEach(f => {
         document.write('<scr'+'ipt src="'+f+'?t='+_t+'"></scr'+'ipt>');
     });
     </script>
@@ -293,6 +293,10 @@
                     body = { index: parseInt(el.dataset.milestoneIdx) };
                     body[el.dataset.milestoneField] = val;
                     url = `${API_BASE}/milestones`;
+                } else if (type === 'section-item') {
+                    body = { sectionId: el.dataset.sid, itemId: parseInt(el.dataset.itemId) };
+                    body[el.dataset.field] = val;
+                    url = `${API_BASE}/sections/items/edit`;
                 }
 
                 if (!url) { alert('Unknown edit type'); el.innerHTML = origHTML; return; }
@@ -753,6 +757,120 @@
             h+='</tbody></table>';
             el.innerHTML=h;
         }); root.appendChild(s4.header); root.appendChild(s4.body);
+
+        // ===== 5. Custom Sections =====
+        async function loadSections() {
+            try { return await fetch(`${API_BASE}/sections/list`).then(r=>r.json()); } catch(e) { return []; }
+        }
+        async function addSection() {
+            const label = prompt('Section name (Hebrew):');
+            if (!label) return;
+            const emoji = prompt('Emoji icon:', '📖') || '📖';
+            const id = prompt('Section ID (English, no spaces):', label.replace(/[^a-zA-Z0-9]/g,'') || 'sec_' + Date.now());
+            if (!id) return;
+            const resp = await fetch(`${API_BASE}/sections/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, label, emoji})});
+            const d = await resp.json();
+            if (d.ok) location.reload(); else alert('Failed: ' + (d.error||''));
+        }
+        async function deleteSection(sid) {
+            if (!confirm('Delete this section and all its items?')) return;
+            await fetch(`${API_BASE}/sections/delete`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:sid})});
+            location.reload();
+        }
+        async function editSectionField(sid, field, value) {
+            const body = {id: sid}; body[field] = value;
+            await fetch(`${API_BASE}/sections/edit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        }
+        async function addSectionItem(sid) {
+            const form = document.getElementById('add-item-form-'+sid);
+            const prompt_text = form.querySelector('.item-prompt').value.trim();
+            const answer = form.querySelector('.item-answer').value.trim();
+            const priority = parseInt(form.querySelector('.item-priority').value) || 1;
+            if (!answer) { alert('Answer is required'); return; }
+            const resp = await fetch(`${API_BASE}/sections/items/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sectionId:sid, prompt:prompt_text, answer, priority})});
+            const d = await resp.json();
+            if (d.ok) { buildSectionItems(sid); form.style.display='none'; } else alert('Failed');
+        }
+        async function deleteSectionItem(sid, itemId) {
+            if (!confirm('Delete this item?')) return;
+            await fetch(`${API_BASE}/sections/items/delete`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sectionId:sid, itemId})});
+            buildSectionItems(sid);
+        }
+        async function editSectionItem(sid, itemId, field, value) {
+            const body = {sectionId:sid, itemId}; body[field] = value;
+            await fetch(`${API_BASE}/sections/items/edit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        }
+        async function buildSectionItems(sid) {
+            const sections = await loadSections();
+            const sec = sections.find(s=>s.id===sid);
+            if (!sec) return;
+            const container = document.querySelector(`[data-section-items="${sid}"]`);
+            if (!container) return;
+            let h='<table><thead><tr><th>#</th><th>Prompt</th><th>Answer</th><th>Audio</th><th></th></tr></thead><tbody>';
+            sec.items.forEach((item,i) => {
+                const escP = (item.prompt||'').replace(/'/g,"\\'");
+                const escA = (item.answer||'').replace(/'/g,"\\'");
+                h+=`<tr>
+                    <td>${item.priority||i+1}</td>
+                    <td class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="prompt" data-val="${escP}" style="direction:rtl;font-weight:700">${item.prompt||'-'}</td>
+                    <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="answer" data-val="${escA}">${item.answer}</span></td>
+                    <td class="ab">
+                        <span style="font-size:0.6rem;color:#888">P</span><button class="btn btn-play" style="width:24px;height:24px;font-size:0.65rem" onclick="pam('audio/sections/${sid}/prompt_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" style="width:24px;height:24px;font-size:0.65rem" onclick="rec('sections/${sid}/prompt_${item.id}.mp3',this)">🎙</button>
+                        <span style="font-size:0.6rem;color:#888;margin-left:4px">A</span><button class="btn btn-play" style="width:24px;height:24px;font-size:0.65rem" onclick="pam('audio/sections/${sid}/answer_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" style="width:24px;height:24px;font-size:0.65rem" onclick="rec('sections/${sid}/answer_${item.id}.mp3',this)">🎙</button>
+                    </td>
+                    <td><button class="btn btn-del" style="width:24px;height:24px;font-size:0.6rem" onclick="deleteSectionItem('${sid}',${item.id})">🗑</button></td>
+                </tr>`;
+            });
+            h+='</tbody></table>';
+            container.innerHTML=h;
+        }
+
+        const sCustom = makeSection('s-custom', '📚 Custom Sections (' + (typeof CUSTOM_SECTIONS!=='undefined'?CUSTOM_SECTIONS.length:0) + ')', async el => {
+            const sections = await loadSections();
+            let h = '<div class="toolbar"><button onclick="addSection()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ New Section</button></div>';
+
+            sections.forEach(sec => {
+                const ov = sec.adminOverride || 'auto';
+                h += `<div style="background:#fff;border:2px solid #ddd;border-radius:12px;padding:12px;margin:12px 0">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <strong style="font-size:1.1rem">${sec.emoji} ${sec.label}</strong>
+                        <button class="btn btn-del" style="width:28px;height:28px;font-size:0.7rem" onclick="deleteSection('${sec.id}')">🗑</button>
+                    </div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:0.85rem">
+                        <label>Threshold: <input type="number" value="${sec.threshold||0}" style="width:60px;padding:4px;border:1px solid #ddd;border-radius:4px" onchange="editSectionField('${sec.id}','threshold',this.value)"></label>
+                        <label>Visibility: <select onchange="editSectionField('${sec.id}','adminOverride',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:4px">
+                            <option value="auto" ${ov==='auto'?'selected':''}>Auto (by score)</option>
+                            <option value="show" ${ov==='show'?'selected':''}>Always show</option>
+                            <option value="hide" ${ov==='hide'?'selected':''}>Hidden</option>
+                        </select></label>
+                        <label>Order: <select onchange="editSectionField('${sec.id}','ordering',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:4px">
+                            <option value="random" ${sec.ordering==='random'?'selected':''}>Random</option>
+                            <option value="sequential" ${sec.ordering==='sequential'?'selected':''}>Sequential</option>
+                        </select></label>
+                    </div>
+                    <div style="margin:8px 0">
+                        <button onclick="document.getElementById('add-item-form-${sec.id}').style.display='block'" style="padding:4px 12px;border-radius:6px;border:1px solid #4CAF50;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-size:0.8rem;font-weight:700">+ Add Item</button>
+                    </div>
+                    <div id="add-item-form-${sec.id}" class="add-form" style="display:none">
+                        <label>Prompt (Hebrew)</label><input class="item-prompt" placeholder="e.g. ?מה אומר כלב">
+                        <label class="required">Answer with nikud</label><input class="item-answer" placeholder="e.g. כֶּלֶב">
+                        <label>Priority/Order</label><input class="item-priority" type="number" value="1">
+                        <div class="form-actions">
+                            <button onclick="addSectionItem('${sec.id}')" style="background:#4CAF50;color:#fff">Add Item</button>
+                            <button onclick="document.getElementById('add-item-form-${sec.id}').style.display='none'" style="background:#eee;color:#333">Cancel</button>
+                        </div>
+                    </div>
+                    <div data-section-items="${sec.id}"><div style="text-align:center;color:#999;padding:8px">Loading...</div></div>
+                </div>`;
+            });
+            el.innerHTML = h;
+            // Load items for each section
+            sections.forEach(sec => buildSectionItems(sec.id));
+        });
+        root.appendChild(sCustom.header); root.appendChild(sCustom.body);
+
+        // Handle section-item edits in the startEdit flow
+        const origStartEdit = startEdit;
     </script>
 </body>
 </html>

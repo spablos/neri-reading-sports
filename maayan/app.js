@@ -219,6 +219,17 @@ class Game {
         this.funFactsPool = typeof FUN_FACTS !== 'undefined' ? shuffle([...FUN_FACTS]) : [];
         this.funFactIdx = 0;
 
+        // Custom sections pools
+        this.sectionPools = {};
+        if (typeof CUSTOM_SECTIONS !== 'undefined') {
+            CUSTOM_SECTIONS.forEach(sec => {
+                const items = sec.ordering === 'sequential'
+                    ? [...sec.items].sort((a, b) => (a.priority || 0) - (b.priority || 0))
+                    : shuffle([...sec.items]);
+                this.sectionPools[sec.id] = { section: sec, pool: items, idx: 0 };
+            });
+        }
+
         // DOM refs
         this.dom = {
             app: document.getElementById('app'),
@@ -382,18 +393,49 @@ class Game {
         if (this.funFactsUnlocked) {
             this.dom.modeTabs.classList.remove('hidden');
         }
-        // Tab click handlers
-        this.dom.modeTabs.querySelectorAll('.mode-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const newMode = tab.dataset.mode;
-                if (newMode === this.mode) return;
-                this.mode = newMode;
-                this.dom.modeTabs.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                this.stopAllAudio();
-                this.loadNext();
-            });
+        // Add custom section tabs dynamically
+        this.refreshSectionTabs();
+        // Tab click handler (event delegation on container)
+        this.dom.modeTabs.addEventListener('click', (e) => {
+            const tab = e.target.closest('.mode-tab');
+            if (!tab) return;
+            const newMode = tab.dataset.mode;
+            if (newMode === this.mode) return;
+            this.mode = newMode;
+            this.dom.modeTabs.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            this.stopAllAudio();
+            this.loadNext();
         });
+    }
+
+    isSectionVisible(sec) {
+        if (sec.adminOverride === 'show') return true;
+        if (sec.adminOverride === 'hide') return false;
+        return this.score >= (sec.threshold || 0);
+    }
+
+    refreshSectionTabs() {
+        if (typeof CUSTOM_SECTIONS === 'undefined') return;
+        let hasVisible = false;
+        CUSTOM_SECTIONS.forEach(sec => {
+            const visible = this.isSectionVisible(sec);
+            let tab = this.dom.modeTabs.querySelector(`[data-mode="${sec.id}"]`);
+            if (visible && !tab) {
+                tab = document.createElement('button');
+                tab.className = 'mode-tab';
+                tab.dataset.mode = sec.id;
+                tab.textContent = `${sec.emoji} ${sec.label}`;
+                this.dom.modeTabs.appendChild(tab);
+            } else if (!visible && tab) {
+                tab.remove();
+                if (this.mode === sec.id) { this.mode = 'players'; }
+            }
+            if (visible) hasVisible = true;
+        });
+        if (this.funFactsUnlocked || hasVisible) {
+            this.dom.modeTabs.classList.remove('hidden');
+        }
     }
 
     // Load next item based on current mode
@@ -431,6 +473,8 @@ class Game {
         }
         if (this.mode === 'funfacts') {
             this.loadNextFunFact();
+        } else if (this.sectionPools[this.mode]) {
+            this.loadNextCustomItem(this.mode);
         } else {
             this.loadNextPlayer();
         }
@@ -782,6 +826,76 @@ class Game {
         }, 600);
 
         // Save state so refresh returns to this player
+        this.saveState();
+    }
+
+    // ===== Load Custom Section Item =====
+    loadNextCustomItem(sectionId) {
+        this.stopAllAudio();
+        const pool = this.sectionPools[sectionId];
+        if (!pool || pool.pool.length === 0) { this.loadNextPlayer(); return; }
+
+        // Pick next item
+        if (pool.idx >= pool.pool.length) {
+            pool.pool = pool.section.ordering === 'sequential'
+                ? [...pool.section.items].sort((a, b) => (a.priority || 0) - (b.priority || 0))
+                : shuffle([...pool.section.items]);
+            pool.idx = 0;
+        }
+        const item = pool.pool[pool.idx++];
+        this.currentPlayer = null;
+        this.currentFact = null;
+        this.currentCustomItem = item;
+        this.currentCustomSection = sectionId;
+
+        // Show question card
+        this.dom.playerCard.style.display = 'none';
+        this.dom.questionCard.classList.remove('hidden');
+        this.dom.questionEmoji.textContent = pool.section.emoji;
+        this.dom.questionText.textContent = item.prompt || item.answer;
+
+        // Tokenize the answer
+        const answerTokens = HEBREW.tokenize(item.answer);
+        const letterTokens = answerTokens.filter(t => t !== ' ');
+        const syllableSounds = Syllables.build(letterTokens);
+        let li = 0;
+        const soundByIdx = {};
+        answerTokens.forEach((tok, ni) => {
+            if (tok !== ' ') { soundByIdx[ni] = syllableSounds[li++]; }
+        });
+
+        // Build drop zones and tokens
+        this.buildDropZones(answerTokens);
+        this.dom.tokensContainer.innerHTML = '';
+        const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
+        const letterIndices = answerTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
+        const shuffledIndices = shuffle([...letterIndices]);
+        this.tokens = shuffledIndices.map(origIdx => {
+            const tok = answerTokens[origIdx];
+            const el = document.createElement('div');
+            const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
+            el.className = `token ${ballClass}`;
+            el.textContent = tok;
+            el.dataset.origIndex = origIdx;
+            el.dataset.text = tok;
+            this.dom.tokensContainer.appendChild(el);
+            return { text: tok, index: origIdx, sound: soundByIdx[origIdx], element: el, originalX: 0, originalY: 0, placed: false };
+        });
+
+        this.tokens.forEach(t => this.attachDragToToken(t));
+        requestAnimationFrame(() => this.scatterTokens());
+
+        // Audio
+        const promptAudio = `audio/sections/${sectionId}/prompt_${item.id}.mp3`;
+        const answerAudio = `audio/sections/${sectionId}/answer_${item.id}.mp3`;
+        const qBtn = document.getElementById('hear-question-btn');
+        setTimeout(() => { this.stopAllAudio(); this.playAudioFile(promptAudio); }, 600);
+        qBtn.onclick = () => this.playAudioWithFallback(promptAudio, item.prompt || item.answer, qBtn);
+        this.dom.hearBtn.onclick = () => this.playAudioWithFallback(answerAudio, item.answer, this.dom.hearBtn);
+
+        this.dom.hintBtn.classList.remove('hidden');
+        this.dom.hintBtn.onclick = () => this.giveHint();
+        this.dom.skipBtn.onclick = () => this.skipCurrent();
         this.saveState();
     }
 
@@ -1229,6 +1343,7 @@ class Game {
         void this.dom.scoreValue.offsetWidth;
         this.dom.scoreValue.classList.add('score-pop');
         this.saveState();
+        this.refreshSectionTabs();
     }
 
     // Pick a random index and play matching audio + return { text, audioDone }

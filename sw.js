@@ -13,6 +13,7 @@ const CORE_FILES = [
     '/neri/manifest.json',
     '/neri/icon-192.png',
     '/neri/icon-512.png',
+    '/neri/sections.js',
 ];
 
 // Install: cache core files immediately
