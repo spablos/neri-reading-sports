@@ -746,7 +746,9 @@
         // 0. Score Management
         const sScore = makeSection('s-scores', '🎯 Score Management', async el => {
             const identities = [
-                { label: 'מעין (Maayan)', api: '/maayan/api', identity: '' },
+                { label: 'מעין (Maayan)', api: '/maayan/api', identity: 'maayan' },
+                { label: 'אופרי (Ofri)', api: '/maayan/api', identity: 'ofri' },
+                { label: 'בומרים (Boomerim)', api: '/maayan/api', identity: 'boomerim' },
             ];
             let h = '<table><thead><tr><th>Player</th><th>Score</th><th></th></tr></thead><tbody>';
             identities.forEach((id, i) => {

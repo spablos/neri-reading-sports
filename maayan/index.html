@@ -31,6 +31,7 @@
         </header>
 
         <!-- Score Panel -->
+        <div id="identity-badge" class="hidden"></div>
         <div id="score-panel">
             <div id="score-label">ניקוד</div>
             <div id="score-value">0</div>
@@ -109,7 +110,11 @@
             <div id="start-content">
                 <h1 id="start-title"></h1>
                 <div id="start-soccer">⚽</div>
-                <button id="start-btn">בואו נתחיל!</button>
+                <div id="identity-buttons">
+                    <button class="identity-btn" data-identity="ofri">אופרי</button>
+                    <button class="identity-btn identity-main" data-identity="maayan">מעין</button>
+                    <button class="identity-btn" data-identity="boomerim">בומרים</button>
+                </div>
             </div>
             <!-- Refresh button also on start screen -->
             <div id="version-bar-start">

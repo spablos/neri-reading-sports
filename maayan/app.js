@@ -183,6 +183,7 @@ const MILESTONES = [
 // ===== Main Game =====
 class Game {
     constructor() {
+        this.identity = null;
         this.currentPlayer = null;
         this.currentFact = null;    // current fun fact question
         this.mode = 'players';      // 'players' or 'funfacts'
@@ -271,6 +272,7 @@ class Game {
 
     // Persist game state to localStorage
     saveState() {
+        if (!this.identity) return;
         const state = {
             score: this.score,
             milestoneCount: this.milestoneCount,
@@ -281,7 +283,7 @@ class Game {
             currentFactIdx: this.currentFact ? this.currentFact._origIdx : null,
             lastActiveTime: Date.now(),
         };
-        localStorage.setItem('maayan-game-state', JSON.stringify(state));
+        localStorage.setItem('maayan-game-state-' + this.identity, JSON.stringify(state));
         this.syncToServer(state);
     }
 
@@ -292,7 +294,7 @@ class Game {
             fetch('/maayan/api/state/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state }),
+                body: JSON.stringify({ identity: this.identity, state }),
             }).catch(() => {});
         }, 2000);
     }
@@ -324,20 +326,27 @@ class Game {
     }
 
     async loadState() {
+        const localKey = 'maayan-game-state-' + this.identity;
+        // Migrate old single-identity state for maayan (one-time)
+        if (!localStorage.getItem(localKey) && localStorage.getItem('maayan-game-state')) {
+            if (this.identity === 'maayan') {
+                localStorage.setItem(localKey, localStorage.getItem('maayan-game-state'));
+            }
+        }
         // Try server first
         try {
-            const resp = await fetch('/maayan/api/state/load');
+            const resp = await fetch('/maayan/api/state/load?identity=' + encodeURIComponent(this.identity));
             if (resp.ok) {
                 const data = await resp.json();
                 if (data && data.score !== undefined) {
                     this.applyState(data);
-                    localStorage.setItem('maayan-game-state', JSON.stringify(data));
+                    localStorage.setItem(localKey, JSON.stringify(data));
                     return;
                 }
             }
         } catch(_) {}
         // Fallback to localStorage
-        const saved = JSON.parse(localStorage.getItem('maayan-game-state') || '{}');
+        const saved = JSON.parse(localStorage.getItem(localKey) || '{}');
         this.applyState(saved);
     }
 
@@ -358,11 +367,6 @@ class Game {
 
         // Skip button — always active, always visible
         this.dom.skipBtn.onclick = () => this.skipCurrent();
-
-        // Load state from server, then restore displayed score
-        this.loadState().then(() => {
-            this.dom.scoreValue.textContent = this.score;
-        });
 
         // Shortcut: triple-tap the score to toggle fun facts lock/unlock
         let tapCount = 0;
@@ -454,7 +458,7 @@ class Game {
         // On first load after refresh, try to restore saved context
         if (this._restoreOnce === undefined) {
             this._restoreOnce = true;
-            const saved = JSON.parse(localStorage.getItem('maayan-game-state') || '{}');
+            const saved = JSON.parse(localStorage.getItem('maayan-game-state-' + this.identity) || '{}');
             if (saved.currentMode) {
                 this.mode = saved.currentMode;
                 // Update tab UI
@@ -520,40 +524,58 @@ class Game {
     buildStartScreen() {
         this.dom.startTitle.textContent = '⚽ מעין לומד לקרוא ⚽';
         this.dom.startTitle.style.cursor = 'pointer';
-        // Play title audio
         const playTitle = () => {
             const a = new Audio('audio/title.mp3?t=' + Date.now());
             a.play().catch(() => {});
         };
-        // Click on title replays it
         this.dom.startTitle.addEventListener('click', playTitle);
-        // Try auto-play on load (may be blocked by browser — that's OK, user can tap title)
         setTimeout(() => {
             const a = new Audio('audio/title.mp3?t=' + Date.now());
-            a.play().catch(() => {}); // silently fail if blocked
+            a.play().catch(() => {});
         }, 500);
 
-        this.dom.startBtn.addEventListener('click', () => {
-            try { SFX._getCtx(); } catch(e) {}
-            this.audioPlayer = new Audio();
-            this.audioPlayer.volume = 1.0;
-            this.audioPlayer.playbackRate = 1.2;
-            this.audioPlayer.src = CORRECT_AUDIO[0];
-            this.audioPlayer.play().then(() => {
-                this.audioPlayer.pause();
-                this.audioPlayer.currentTime = 0;
-            }).catch(() => {});
-            this.dom.startScreen.classList.add('hidden');
-            this.isAnimating = false;
-            this.loadNext();
+        // Identity buttons
+        document.querySelectorAll('.identity-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectIdentity(btn.dataset.identity);
+            });
         });
+    }
 
-        // If returning from a recent refresh, show a quick-resume message
-        const saved = JSON.parse(localStorage.getItem('maayan-game-state') || '{}');
-        const secondsSinceActive = (Date.now() - (saved.lastActiveTime || 0)) / 1000;
-        if ((saved.currentPlayerId || saved.currentFactIdx) && secondsSinceActive < 60) {
-            this.dom.startBtn.textContent = '▶ המשך לשחק';
-        }
+    async selectIdentity(identity) {
+        this.identity = identity;
+
+        // Show identity badge
+        const idNames = { maayan: 'מעין', ofri: 'אופרי', boomerim: 'בומרים' };
+        const badge = document.getElementById('identity-badge');
+        badge.textContent = idNames[identity] || identity;
+        badge.classList.remove('hidden');
+
+        // Initialize audio
+        try { SFX._getCtx(); } catch(e) {}
+        this.audioPlayer = new Audio();
+        this.audioPlayer.volume = 1.0;
+        this.audioPlayer.playbackRate = 1.2;
+        this.audioPlayer.src = CORRECT_AUDIO[0];
+        this.audioPlayer.play().then(() => {
+            this.audioPlayer.pause();
+            this.audioPlayer.currentTime = 0;
+        }).catch(() => {});
+
+        // Load state from server, fallback to localStorage
+        await this.loadState();
+
+        // Update displayed score and UI
+        this.dom.scoreValue.textContent = this.score;
+        this.setupModeTabs();
+
+        // Start activity tracking with identity
+        if (window._startTracking) window._startTracking(identity);
+
+        // Hide start screen and begin
+        this.dom.startScreen.classList.add('hidden');
+        this.isAnimating = false;
+        this.loadNext();
     }
 
     // ===== Background clouds =====

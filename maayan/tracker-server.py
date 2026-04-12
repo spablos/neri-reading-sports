@@ -723,15 +723,25 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.end_headers()
             return
+        identity = data.get('identity', 'maayan')
+        if identity not in ('maayan', 'ofri', 'boomerim'):
+            self._respond_json({'ok': False, 'error': 'invalid identity'})
+            return
         state = data.get('state', {})
-        state_file = os.path.join(STATE_DIR, 'state-maayan.json')
+        state_file = os.path.join(STATE_DIR, f'state-{identity}.json')
         os.makedirs(STATE_DIR, exist_ok=True)
         with open(state_file, 'w') as f:
             json.dump(state, f, ensure_ascii=False)
         self._respond_json({'ok': True})
 
     def _handle_state_load(self):
-        state_file = os.path.join(STATE_DIR, 'state-maayan.json')
+        from urllib.parse import urlparse, parse_qs
+        qs = parse_qs(urlparse(self.path).query)
+        identity = qs.get('identity', ['maayan'])[0]
+        if identity not in ('maayan', 'ofri', 'boomerim'):
+            self._respond_json({})
+            return
+        state_file = os.path.join(STATE_DIR, f'state-{identity}.json')
         if os.path.exists(state_file):
             try:
                 with open(state_file) as f:
