@@ -401,6 +401,59 @@
                 fetch(`${API_BASE}/players/nextid`).then(r=>r.json()).then(d=>{ document.getElementById('ap-id').value = d.nextId; });
             }
         }
+        // ===== FotMob search =====
+        let _fotmobTimer = null;
+        function searchFotmob(query) {
+            clearTimeout(_fotmobTimer);
+            const results = document.getElementById('ap-fotmob-results');
+            if (query.length < 2) { results.style.display = 'none'; return; }
+            _fotmobTimer = setTimeout(async () => {
+                try {
+                    const resp = await fetch(`https://www.fotmob.com/api/searchapi/suggest?term=${encodeURIComponent(query)}&lang=en`);
+                    const data = await resp.json();
+                    const players = (data.squadMemberSuggest || data.players || []).slice(0, 8);
+                    if (!players.length) { results.innerHTML = '<div style="padding:10px;color:#999;text-align:center">No results</div>'; results.style.display = 'block'; return; }
+                    let h = '';
+                    players.forEach(p => {
+                        const pid = p.id || p.playerId;
+                        const name = p.name || p.firstName + ' ' + p.lastName;
+                        const team = p.teamName || p.team || '';
+                        const imgUrl = `https://images.fotmob.com/image_resources/playerimages/${pid}.png`;
+                        h += `<div onclick="selectFotmobPlayer(${pid},'${name.replace(/'/g,"\\'")}','${team.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background 0.15s" onmouseover="this.style.background='#E3F2FD'" onmouseout="this.style.background=''">
+                            <img src="${imgUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;background:#eee" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 36 36%22><circle cx=%2218%22 cy=%2218%22 r=%2218%22 fill=%22%23ddd%22/></svg>'">
+                            <div><div style="font-weight:700;font-size:0.9rem">${name}</div><div style="font-size:0.75rem;color:#888">${team}</div></div>
+                        </div>`;
+                    });
+                    results.innerHTML = h;
+                    results.style.display = 'block';
+                } catch(e) {
+                    // FotMob API may block CORS — fallback to manual ID entry
+                    results.innerHTML = `<div style="padding:10px;font-size:0.8rem;color:#888;text-align:center">
+                        Search unavailable. Enter FotMob ID manually:<br>
+                        <input id="ap-fotmob-manual" placeholder="FotMob ID" style="margin-top:6px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;width:120px" oninput="selectFotmobPlayer(parseInt(this.value)||0,'','')">
+                    </div>`;
+                    results.style.display = 'block';
+                }
+            }, 300);
+        }
+        function selectFotmobPlayer(pid, name, team) {
+            document.getElementById('ap-fotmob').value = pid || '';
+            document.getElementById('ap-fotmob-search').value = name || pid;
+            document.getElementById('ap-fotmob-results').style.display = 'none';
+            const preview = document.getElementById('ap-fotmob-preview');
+            if (pid) {
+                preview.innerHTML = `<img src="https://images.fotmob.com/image_resources/playerimages/${pid}.png" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<span style=\\'color:#c00;font-size:0.65rem\\'>Not found</span>'">`;
+            }
+            if (team && !document.getElementById('ap-team').value) {
+                document.getElementById('ap-team').value = team;
+            }
+        }
+        function updateColorPreview() {
+            const c1 = document.getElementById('ap-color1').value;
+            const c2 = document.getElementById('ap-color2').value;
+            document.getElementById('ap-color-preview').style.background = `linear-gradient(90deg,${c1} 50%,${c2} 50%)`;
+        }
+
         function submitAddPlayer() {
             const name = document.getElementById('ap-name').value.trim();
             const fullName = document.getElementById('ap-fullname').value.trim();
@@ -411,7 +464,7 @@
                 team: document.getElementById('ap-team').value.trim() || '',
                 number: parseInt(document.getElementById('ap-number').value) || 0,
                 fotmobId: document.getElementById('ap-fotmob').value.trim() || 'null',
-                colors: document.getElementById('ap-colors').value.trim() || "['#4CAF50','#FFFFFF']",
+                colors: `['${document.getElementById('ap-color1').value}','${document.getElementById('ap-color2').value}']`,
                 description: document.getElementById('ap-desc').value.trim() || '',
             };
             fetch(`${API_BASE}/players/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
@@ -662,8 +715,22 @@
                 <label class="required">Display name</label><input id="ap-fullname" placeholder="e.g. ליאונל מסי">
                 <label>Team</label><input id="ap-team" placeholder="e.g. מכבי תל אביב">
                 <label>Shirt number</label><input id="ap-number" type="number" value="0">
-                <label>FotMob ID</label><input id="ap-fotmob" placeholder="e.g. 30981 (for player image)">
-                <label>Team colors</label><input id="ap-colors" value="['#4CAF50','#FFFFFF']">
+                <label>Player image — search by name</label>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <input id="ap-fotmob-search" placeholder="Search player name..." style="flex:1" oninput="searchFotmob(this.value)">
+                    <input id="ap-fotmob" type="hidden">
+                    <div id="ap-fotmob-preview" style="width:50px;height:50px;border-radius:50%;border:2px solid #ddd;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5">
+                        <span style="color:#ccc;font-size:0.7rem">No img</span>
+                    </div>
+                </div>
+                <div id="ap-fotmob-results" style="display:none;max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;background:#fff;margin-top:4px"></div>
+                <label>Team colors</label>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input id="ap-color1" type="color" value="#4CAF50" style="width:50px;height:36px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px" onchange="updateColorPreview()">
+                    <input id="ap-color2" type="color" value="#FFFFFF" style="width:50px;height:36px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px" onchange="updateColorPreview()">
+                    <div id="ap-color-preview" style="width:40px;height:30px;border-radius:6px;border:1px solid #ddd;background:linear-gradient(90deg,#4CAF50 50%,#FFFFFF 50%)"></div>
+                </div>
+                <input id="ap-colors" type="hidden" value="['#4CAF50','#FFFFFF']">
                 <label>Description (Hebrew)</label><input id="ap-desc" placeholder="Optional — or use Claude Code to generate">
                 <div class="form-actions">
                     <button onclick="submitAddPlayer()" style="background:#4CAF50;color:#fff">Add Player</button>
