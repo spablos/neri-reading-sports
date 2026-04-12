@@ -1191,6 +1191,18 @@
             const builtinOv = config.builtinOverrides || {};
             let h = `<div style="background:#fff;border:2px solid #90CAF9;border-radius:12px;padding:12px;margin-bottom:12px">
                 <strong style="font-size:0.95rem">Built-in sections — per-user visibility</strong>
+                <span onclick="document.getElementById('visibility-help').classList.toggle('hidden')" style="cursor:pointer;font-size:0.9rem;margin-right:4px" title="Help">❓</span>
+                <div id="visibility-help" class="hidden" style="background:#E3F2FD;border-radius:8px;padding:10px;margin-top:6px;font-size:0.8rem;line-height:1.5;color:#333">
+                    <strong>Visibility options:</strong><br>
+                    <b>Default</b> — Players: always visible. Fun Facts: hidden until unlocked (triple-tap on score).<br>
+                    <b>Show</b> — Force visible regardless of any rules.<br>
+                    <b>Hide</b> — Force hidden regardless of any rules.<br><br>
+                    <strong>Custom sections:</strong><br>
+                    <b>Default / Auto</b> — Section appears when the user's score reaches the threshold set on the section.<br>
+                    <b>Show</b> — Always visible regardless of score.<br>
+                    <b>Hide</b> — Never visible regardless of score.<br>
+                    <b>Custom threshold</b> — The number field overrides the section's threshold for that specific user.
+                </div>
                 <div style="margin-top:6px">
                 ${['players','funfacts'].map(mode => {
                     const modeLabel = mode === 'players' ? '⚽ Players' : '🧠 Fun Facts';
