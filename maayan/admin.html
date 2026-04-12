@@ -1016,7 +1016,30 @@
             }
             const resp = await fetch(`${API_BASE}/sections/items/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sectionId:sid, prompt:prompt_text, answer, priority, image})});
             const d = await resp.json();
-            if (d.ok) { buildSectionItems(sid); form.style.display='none'; } else alert('Failed');
+            if (d.ok) {
+                buildSectionItems(sid);
+                form.style.display='none';
+                // Show syllable recording area
+                const tokens = HEBREW.tokenize(answer).filter(t=>t!==' ');
+                const sounds = Syllables.build(tokens);
+                let recH = `<div style="background:#E8F5E9;border:2px solid #4CAF50;border-radius:12px;padding:12px;margin:8px 0">
+                    <h4 style="margin:0 0 8px;color:#333">Item added! Record audio & syllables:</h4>
+                    <table style="margin:4px 0"><tbody>
+                    <tr><td style="direction:rtl;font-weight:700">${prompt_text||answer}</td>
+                        <td><span style="font-size:0.7rem;color:#888">Q</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/prompt_${d.itemId}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/prompt_${d.itemId}.mp3',this)">🎙</button></span></td></tr>
+                    <tr><td class="name-nikud" style="direction:rtl">${answer}</td>
+                        <td><span style="font-size:0.7rem;color:#888">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/answer_${d.itemId}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/answer_${d.itemId}.mp3',this)">🎙</button></span></td></tr>
+                    </tbody></table>
+                    <div style="margin-top:8px;font-weight:700;font-size:0.85rem">Syllables:</div>
+                    <table style="border:2px solid #90CAF9;border-radius:8px;margin-top:4px"><tbody>`;
+                tokens.forEach((t,i) => {
+                    const es = encodeURIComponent(sounds[i]);
+                    recH += `<tr style="background:#f5f5f5"><td style="direction:rtl;padding:4px 12px"><span style="font-size:1.1rem;font-family:'Noto Sans Hebrew',sans-serif;background:#fff;padding:2px 8px;border-radius:6px;border:1px solid #ddd">${t}</span> → <span style="color:#888">${sounds[i]}</span></td>
+                    <td class="ab"><button class="btn btn-play" style="width:26px;height:26px;font-size:0.7rem" onclick="pam('audio/tokens/${es}.mp3',this)">▶</button><button class="btn btn-rec" style="width:26px;height:26px;font-size:0.7rem" onclick="rec('tokens/${es}.mp3',this)">🎙</button></td></tr>`;
+                });
+                recH += `</tbody></table></div>`;
+                form.insertAdjacentHTML('afterend', recH);
+            } else alert('Failed');
         }
         async function deleteSectionItem(sid, itemId) {
             if (!confirm('Delete this item?')) return;
@@ -1050,7 +1073,7 @@
                 </tr>
                 <tr style="border-bottom:2px solid #ddd">
                     <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="answer" data-val="${escA}">${item.answer}</span>
-                        <button class="btn btn-tok" style="width:22px;height:22px;font-size:0.6rem" onclick="toggleTokens(this,'${escA}','sec',0)">🔤</button></td>
+                        <button class="btn btn-tok" style="width:28px;height:28px;font-size:0.75rem;background:#FF9800" onclick="toggleTokens(this,'${escA}','sec',0)" title="Show syllables & record">🔤</button></td>
                     <td><span style="font-size:0.7rem;color:#888;margin-left:4px">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/answer_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/answer_${item.id}.mp3',this)">🎙</button></span></td>
                 </tr>`;
             });
