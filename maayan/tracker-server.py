@@ -172,10 +172,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _handle_audio_upload(self):
         """Accept audio upload. Auto-converts non-MP3 (e.g. WebM) to MP3 via ffmpeg."""
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import urlparse, parse_qs, unquote
         import subprocess, tempfile
         qs = parse_qs(urlparse(self.path).query)
-        rel_path = qs.get('path', [''])[0]
+        rel_path = unquote(qs.get('path', [''])[0])
         if not rel_path.endswith('.mp3') or '..' in rel_path or rel_path.startswith('/'):
             self._respond_json({'ok': False, 'error': 'invalid path'})
             return
