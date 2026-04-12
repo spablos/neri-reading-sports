@@ -1177,7 +1177,6 @@ class Game {
             const pos = getPos(e);
             zone.ctx.beginPath();
             zone.ctx.moveTo(pos.x, pos.y);
-            if (zone.sound) this.playTokenSound(zone.sound);
         };
         const onMove = (e) => {
             if (!zone.drawing || zone.done) return;
@@ -1193,7 +1192,9 @@ class Game {
             if (!zone.drawing || zone.done) return;
             e.stopPropagation();
             zone.drawing = false;
-            this.checkTraceCoverage(zone);
+            // Check coverage after a short pause (let the child lift finger)
+            clearTimeout(zone._checkTimer);
+            zone._checkTimer = setTimeout(() => this.checkTraceCoverage(zone), 300);
         };
         zone.canvas.addEventListener('mousedown', onStart);
         zone.canvas.addEventListener('mousemove', onMove);
@@ -1220,7 +1221,7 @@ class Game {
             if (maskData[p] > 0 && drawnData[p] > 0) covered++;
         }
         const ratio = zone.totalPixels > 0 ? covered / zone.totalPixels : 0;
-        if (ratio >= 0.55) {
+        if (ratio >= 0.25) {
             this.handleTraceComplete(zone);
         }
     }
@@ -1231,15 +1232,17 @@ class Game {
         // Find matching dropZone and mark filled
         const dz = this.dropZones.find(d => d.index === zone.index);
         if (dz) dz.filled = true;
-        // Score + feedback
+        // Play syllable sound for this letter
+        if (zone.sound) this.playTokenSound(zone.sound);
+        // Score + positive feedback
         SFX.correctDing();
         this.score++;
         this.updateScore();
         this.showStarBurst(zone.element);
         this.showFeedback('correct');
-        // Check if all done
+        // Check if entire word is done
         if (this.tracingZones.every(z => z.done)) {
-            setTimeout(() => this.handleNameComplete(), 400);
+            setTimeout(() => this.handleNameComplete(), 800);
         }
     }
 
