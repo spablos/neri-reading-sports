@@ -445,6 +445,43 @@
             const directInput = document.getElementById('ap-fotmob-direct');
             if (directInput) directInput.value = pid;
         }
+        function switchImageTab(tab) {
+            const searchPanel = document.getElementById('img-panel-search');
+            const uploadPanel = document.getElementById('img-panel-upload');
+            const searchTab = document.getElementById('img-tab-search');
+            const uploadTab = document.getElementById('img-tab-upload');
+            if (tab === 'search') {
+                searchPanel.style.display = ''; uploadPanel.style.display = 'none';
+                searchTab.style.background = '#E3F2FD'; searchTab.style.color = '#1976D2'; searchTab.style.borderBottom = '2px solid #1976D2';
+                uploadTab.style.background = '#f5f5f5'; uploadTab.style.color = '#666'; uploadTab.style.borderBottom = 'none';
+            } else {
+                searchPanel.style.display = 'none'; uploadPanel.style.display = '';
+                uploadTab.style.background = '#E3F2FD'; uploadTab.style.color = '#1976D2'; uploadTab.style.borderBottom = '2px solid #1976D2';
+                searchTab.style.background = '#f5f5f5'; searchTab.style.color = '#666'; searchTab.style.borderBottom = 'none';
+            }
+        }
+        function previewUploadedPhoto(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.getElementById('ap-fotmob-preview');
+                preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+            };
+            reader.readAsDataURL(file);
+            // Clear FotMob selection since we're uploading
+            document.getElementById('ap-fotmob').value = '';
+        }
+        async function uploadPlayerPhoto(playerId) {
+            const input = document.getElementById('ap-photo-file');
+            if (!input.files || !input.files[0]) return null;
+            const file = input.files[0];
+            const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+            const filename = `${playerId}.${ext}`;
+            const resp = await fetch(`${API_BASE}/image/upload?name=${encodeURIComponent(filename)}`, { method: 'POST', body: file });
+            const d = await resp.json();
+            return d.ok ? d.path : null;
+        }
         function previewFotmobId(val) {
             const pid = parseInt(val);
             if (!pid) return;
@@ -458,16 +495,22 @@
             document.getElementById('ap-color-preview').style.background = `linear-gradient(90deg,${c1} 50%,${c2} 50%)`;
         }
 
-        function submitAddPlayer() {
+        async function submitAddPlayer() {
             const name = document.getElementById('ap-name').value.trim();
             const fullName = document.getElementById('ap-fullname').value.trim();
             if (!name || !fullName) { alert('Name and display name are required'); return; }
+            const pid = parseInt(document.getElementById('ap-id').value) || 0;
+            // Upload photo if selected
+            const photoPath = await uploadPlayerPhoto(pid);
+            const fotmobVal = photoPath
+                ? `'${photoPath}'`
+                : (document.getElementById('ap-fotmob').value.trim() || document.getElementById('ap-fotmob-direct').value.trim() || 'null');
             const data = {
-                id: parseInt(document.getElementById('ap-id').value) || 0,
+                id: pid,
                 name, fullName,
                 team: document.getElementById('ap-team').value.trim() || '',
                 number: parseInt(document.getElementById('ap-number').value) || 0,
-                fotmobId: document.getElementById('ap-fotmob').value.trim() || document.getElementById('ap-fotmob-direct').value.trim() || 'null',
+                fotmobId: fotmobVal,
                 colors: `['${document.getElementById('ap-color1').value}','${document.getElementById('ap-color2').value}']`,
                 description: document.getElementById('ap-desc').value.trim() || '',
             };
@@ -719,18 +762,28 @@
                 <label class="required">Display name</label><input id="ap-fullname" placeholder="e.g. ליאונל מסי">
                 <label>Team</label><input id="ap-team" placeholder="e.g. מכבי תל אביב">
                 <label>Shirt number</label><input id="ap-number" type="number" value="0">
-                <label>Player image — search or enter FotMob ID</label>
-                <div style="display:flex;gap:6px;align-items:center">
-                    <input id="ap-fotmob-search" placeholder="Search player name..." style="flex:1" oninput="searchFotmob(this.value)">
-                    <input id="ap-fotmob" type="hidden">
+                <label>Player image</label>
+                <input id="ap-fotmob" type="hidden">
+                <input id="ap-custom-image" type="hidden">
+                <div style="display:flex;gap:4px;margin-bottom:6px">
+                    <button type="button" onclick="switchImageTab('search')" id="img-tab-search" style="padding:4px 12px;border-radius:6px 6px 0 0;border:1px solid #ddd;border-bottom:2px solid #1976D2;background:#E3F2FD;color:#1976D2;cursor:pointer;font-size:0.8rem;font-weight:700">🔍 Search FotMob</button>
+                    <button type="button" onclick="switchImageTab('upload')" id="img-tab-upload" style="padding:4px 12px;border-radius:6px 6px 0 0;border:1px solid #ddd;border-bottom:none;background:#f5f5f5;color:#666;cursor:pointer;font-size:0.8rem">📷 Upload Photo</button>
+                    <div style="flex:1"></div>
                     <div id="ap-fotmob-preview" style="width:50px;height:50px;border-radius:50%;border:2px solid #ddd;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5">
                         <span style="color:#ccc;font-size:0.7rem">No img</span>
                     </div>
                 </div>
-                <div id="ap-fotmob-results" style="display:none;max-height:250px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;background:#fff;margin-top:4px"></div>
-                <div style="margin-top:4px;font-size:0.75rem;color:#888">
-                    Or enter ID directly: <input id="ap-fotmob-direct" placeholder="FotMob ID" style="width:80px;padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem" oninput="previewFotmobId(this.value)">
-                    · <a href="https://www.fotmob.com" target="_blank" style="color:#1976D2">Search on fotmob.com</a> (ID is in the URL)
+                <div id="img-panel-search" style="border:1px solid #ddd;border-radius:0 8px 8px 8px;padding:8px">
+                    <input id="ap-fotmob-search" placeholder="Search player name..." style="width:100%" oninput="searchFotmob(this.value)">
+                    <div id="ap-fotmob-results" style="display:none;max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;background:#fff;margin-top:4px"></div>
+                    <div style="margin-top:4px;font-size:0.75rem;color:#888">
+                        Or enter ID: <input id="ap-fotmob-direct" placeholder="FotMob ID" style="width:70px;padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem" oninput="previewFotmobId(this.value)">
+                        · <a href="https://www.fotmob.com" target="_blank" style="color:#1976D2">fotmob.com</a>
+                    </div>
+                </div>
+                <div id="img-panel-upload" style="display:none;border:1px solid #ddd;border-radius:0 8px 8px 8px;padding:8px">
+                    <input type="file" id="ap-photo-file" accept="image/*" onchange="previewUploadedPhoto(this)" style="font-size:0.85rem">
+                    <div style="font-size:0.75rem;color:#888;margin-top:4px">JPG or PNG, max 10MB. Will be saved on the server.</div>
                 </div>
                 <label>Team colors</label>
                 <div style="display:flex;gap:8px;align-items:center">

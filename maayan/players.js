@@ -27,7 +27,8 @@ const TEAM_INFO = {
 };
 
 function soccer(id, name, fullName, fotmobId, team, colors, num) {
-    return { id, name, fullName, image: fotmobId ? FMOB_IMG(fotmobId) : null, sport:'soccer', team, teamColors:colors, number:num };
+    const image = typeof fotmobId === 'string' ? fotmobId : (fotmobId ? FMOB_IMG(fotmobId) : null);
+    return { id, name, fullName, image, sport:'soccer', team, teamColors:colors, number:num };
 }
 
 const PLAYERS = [

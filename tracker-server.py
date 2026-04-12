@@ -96,6 +96,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_section_item_edit()
         elif path == '/sections/items/delete':
             self._handle_section_item_delete()
+        elif path == '/image/upload':
+            self._handle_image_upload()
         else:
             self.send_response(404)
             self.end_headers()
@@ -590,6 +592,26 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_image_upload(self):
+        """Accept image upload for player photos. Saves to img/players/{id}.jpg"""
+        from urllib.parse import urlparse, parse_qs
+        qs = parse_qs(urlparse(self.path).query)
+        filename = qs.get('name', [''])[0]
+        if not filename or '..' in filename or filename.startswith('/'):
+            self._respond_json({'ok': False, 'error': 'invalid filename'})
+            return
+        length = int(self.headers.get('Content-Length', 0))
+        if length == 0 or length > 10 * 1024 * 1024:
+            self._respond_json({'ok': False, 'error': 'invalid size'})
+            return
+        data = self.rfile.read(length)
+        target_dir = os.path.join(WEB_ROOT, 'img', 'players')
+        os.makedirs(target_dir, exist_ok=True)
+        target = os.path.join(target_dir, filename)
+        with open(target, 'wb') as f:
+            f.write(data)
+        self._respond_json({'ok': True, 'path': f'img/players/{filename}'})
 
     def _handle_fotmob_search(self):
         """Proxy FotMob search API to avoid CORS issues."""

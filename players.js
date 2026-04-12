@@ -65,7 +65,8 @@ function nba(id, name, fullName, nbaId, team, colors, num) {
     return { id, name, fullName, image: NBA_IMG(nbaId), sport:'basketball', team, teamColors:colors, number:num };
 }
 function soccer(id, name, fullName, fotmobId, team, colors, num) {
-    return { id, name, fullName, image: fotmobId ? FMOB_IMG(fotmobId) : null, sport:'soccer', team, teamColors:colors, number:num };
+    const image = typeof fotmobId === 'string' ? fotmobId : (fotmobId ? FMOB_IMG(fotmobId) : null);
+    return { id, name, fullName, image, sport:'soccer', team, teamColors:colors, number:num };
 }
 function israeli(id, name, fullName, sport, team, colors, num, fotmobId) {
     return { id, name, fullName, image: fotmobId ? FMOB_IMG(fotmobId) : null, sport, team, teamColors:colors, number:num };
