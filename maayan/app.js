@@ -418,6 +418,10 @@ class Game {
     }
 
     refreshSectionTabs() {
+        // Show/hide fun facts tab based on unlock state
+        const ffTab = this.dom.modeTabs.querySelector('[data-mode="funfacts"]');
+        if (ffTab) ffTab.style.display = this.funFactsUnlocked ? '' : 'none';
+
         if (typeof CUSTOM_SECTIONS === 'undefined') return;
         let hasVisible = false;
         CUSTOM_SECTIONS.forEach(sec => {
@@ -435,8 +439,11 @@ class Game {
             }
             if (visible) hasVisible = true;
         });
+        // Show tabs container if any section beyond players is visible
         if (this.funFactsUnlocked || hasVisible) {
             this.dom.modeTabs.classList.remove('hidden');
+        } else {
+            this.dom.modeTabs.classList.add('hidden');
         }
     }
 
@@ -1126,7 +1133,7 @@ class Game {
             zone.ctx.scale(dpr, dpr);
             zone.ctx.lineCap = 'round';
             zone.ctx.lineJoin = 'round';
-            zone.ctx.lineWidth = Math.max(12, w * 0.25);
+            zone.ctx.lineWidth = Math.max(4, w * 0.08);
             zone.ctx.strokeStyle = '#4CAF50';
 
             // Create reference mask
