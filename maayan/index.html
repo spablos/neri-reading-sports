@@ -125,11 +125,13 @@
         </div>
     </div>
 
-    <script src="players.js"></script>
-    <script src="descriptions.js"></script>
-    <script src="funfacts.js"></script>
-    <script src="hebrew.js"></script>
-    <script src="sections.js"></script>
+    <script>
+    // Cache-bust data files to always get fresh data
+    const _v = Date.now();
+    ['players.js','descriptions.js','funfacts.js','hebrew.js','sections.js'].forEach(f => {
+        document.write('<scr'+'ipt src="'+f+'?v='+_v+'"></scr'+'ipt>');
+    });
+    </script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
