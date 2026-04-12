@@ -188,9 +188,20 @@
             if (tr && tr.classList.contains('text-row')) tr.style.display = tr.style.display === 'none' ? '' : 'none';
         }
         function toggleTokens(btn, name, pt, pid) {
-            let sib = btn.closest('tr').nextElementSibling;
-            while (sib && !sib.classList.contains('token-drill')) { if (!sib.classList.contains('text-row')) break; sib = sib.nextElementSibling; }
+            // Find the last row of this item pair (skip past text-row, answer row, etc.)
+            let insertAfter = btn.closest('tr');
+            let sib = insertAfter.nextElementSibling;
+            while (sib && !sib.classList.contains('token-drill') && (sib.style.borderBottom || !sib.querySelector('[rowspan]'))) {
+                insertAfter = sib;
+                sib = sib.nextElementSibling;
+                // Stop after the border-bottom row (end of item pair)
+                if (insertAfter.style.borderBottom) break;
+            }
+            // Check if token-drill already exists right after
             if (sib && sib.classList.contains('token-drill')) { sib.remove(); btn.textContent='🔤'; return; }
+            // Also check immediately after insertAfter
+            const next = insertAfter.nextElementSibling;
+            if (next && next.classList.contains('token-drill')) { next.remove(); btn.textContent='🔤'; return; }
             const tokens = HEBREW.tokenize(name).filter(t=>t!==' ');
             const sounds = Syllables.build(tokens);
             let h = '<tr class="token-drill"><td colspan="20"><table style="width:100%;border:2px solid #90CAF9;border-radius:8px"><tbody>';
@@ -200,7 +211,7 @@
                 <td class="ab"><button class="btn btn-play" style="width:26px;height:26px;font-size:0.7rem" onclick="pam('${ap}',this)">▶</button><button class="btn btn-rec" style="width:26px;height:26px;font-size:0.7rem" onclick="rec('${up}',this)">🎙</button></td></tr>`;
             });
             h += '</tbody></table></td></tr>';
-            btn.closest('tr').insertAdjacentHTML('afterend', h); btn.textContent='🔼';
+            insertAfter.insertAdjacentHTML('afterend', h); btn.textContent='🔼';
         }
 
         // ===== Delete =====
