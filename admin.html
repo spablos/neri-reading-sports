@@ -889,20 +889,38 @@
         async function loadSections() {
             try { return await fetch(`${API_BASE}/sections/list`).then(r=>r.json()); } catch(e) { return []; }
         }
-        async function addSection() {
-            const label = prompt('Section name (Hebrew):');
-            if (!label) return;
-            const emoji = prompt('Emoji icon:', '📖') || '📖';
-            const id = prompt('Section ID (English, no spaces):', label.replace(/[^a-zA-Z0-9]/g,'') || 'sec_' + Date.now());
-            if (!id) return;
-            const resp = await fetch(`${API_BASE}/sections/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, label, emoji})});
+        function toggleAddSectionForm() {
+            const form = document.getElementById('add-section-form');
+            const visible = getComputedStyle(form).display !== 'none';
+            form.style.display = visible ? 'none' : 'block';
+        }
+        async function submitAddSection() {
+            const label = document.getElementById('as-label').value.trim();
+            const emoji = document.getElementById('as-emoji').value.trim() || '📖';
+            const id = document.getElementById('as-id').value.trim();
+            if (!label) { alert('Section name is required'); return; }
+            const finalId = id || label.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '').slice(0, 20) || ('sec_' + Date.now());
+            const threshold = parseInt(document.getElementById('as-threshold').value) || 0;
+            const ordering = document.getElementById('as-ordering').value || 'random';
+            const resp = await fetch(`${API_BASE}/sections/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: finalId, label, emoji, threshold, ordering})});
             const d = await resp.json();
-            if (d.ok) location.reload(); else alert('Failed: ' + (d.error||''));
+            if (d.ok) {
+                document.getElementById('add-section-form').style.display = 'none';
+                document.getElementById('as-label').value = '';
+                document.getElementById('as-id').value = '';
+                rebuildCustomSections();
+            } else {
+                alert('Failed: ' + (d.error||''));
+            }
+        }
+        async function rebuildCustomSections() {
+            const el = document.querySelector('#s-custom-body');
+            if (el) { el.dataset.built = ''; await buildCustomSectionsContent(el); }
         }
         async function deleteSection(sid) {
             if (!confirm('Delete this section and all its items?')) return;
             await fetch(`${API_BASE}/sections/delete`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:sid})});
-            location.reload();
+            rebuildCustomSections();
         }
         async function editSectionField(sid, field, value) {
             const body = {id: sid}; body[field] = value;
@@ -952,9 +970,22 @@
             container.innerHTML=h;
         }
 
-        const sCustom = makeSection('s-custom', '📚 Custom Sections (' + (typeof CUSTOM_SECTIONS!=='undefined'?CUSTOM_SECTIONS.length:0) + ')', async el => {
+        async function buildCustomSectionsContent(el) {
             const sections = await loadSections();
-            let h = '<div class="toolbar"><button onclick="addSection()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ New Section</button></div>';
+            let h = `<div class="toolbar"><button onclick="toggleAddSectionForm()" style="background:#E8F5E9;color:#2E7D2;border-color:#4CAF50;font-weight:700">+ New Section</button></div>
+            <div class="add-form" id="add-section-form">
+                <label class="required">Section name (Hebrew)</label><input id="as-label" placeholder="e.g. חיות">
+                <label>Emoji icon</label><input id="as-emoji" placeholder="e.g. 🐾" value="📖" style="font-size:1.3rem">
+                <label>Section ID (English, auto-generated if empty)</label><input id="as-id" placeholder="e.g. animals">
+                <div style="display:flex;gap:12px;margin-top:8px">
+                    <label style="flex:1">Score threshold <input id="as-threshold" type="number" value="0" style="width:100%"></label>
+                    <label style="flex:1">Ordering <select id="as-ordering" style="width:100%"><option value="random">Random</option><option value="sequential">Sequential</option></select></label>
+                </div>
+                <div class="form-actions">
+                    <button onclick="submitAddSection()" style="background:#4CAF50;color:#fff">Create Section</button>
+                    <button onclick="toggleAddSectionForm()" style="background:#eee;color:#333">Cancel</button>
+                </div>
+            </div>`;
             sections.forEach(sec => {
                 const ov = sec.adminOverride || 'auto';
                 h += `<div style="background:#fff;border:2px solid #ddd;border-radius:12px;padding:12px;margin:12px 0">
@@ -991,7 +1022,10 @@
             });
             el.innerHTML = h;
             sections.forEach(sec => buildSectionItems(sec.id));
-        });
+        }
+
+        const sCustom = makeSection('s-custom', '📚 Custom Sections (' + (typeof CUSTOM_SECTIONS!=='undefined'?CUSTOM_SECTIONS.length:0) + ')', buildCustomSectionsContent);
+        sCustom.body.id = 's-custom-body';
         root.appendChild(sCustom.header); root.appendChild(sCustom.body);
     </script>
 </body>
