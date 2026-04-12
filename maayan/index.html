@@ -118,10 +118,11 @@
                     <button class="identity-btn identity-side" data-identity="boomerim">בומרים</button>
                 </div>
             </div>
-            <!-- Refresh button also on start screen -->
+            <!-- Refresh + Reset buttons on start screen -->
             <div id="version-bar-start">
-                <span class="version-label-copy">v1.1</span>
+                <span class="version-label-copy">v1.3</span>
                 <button class="refresh-btn-copy" title="עדכן גירסה">🔄</button>
+                <button onclick="nuclearReset()" style="background:#d32f2f;color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:0.75rem;cursor:pointer;margin-right:6px" title="Clear all cache and storage">🗑 Reset</button>
             </div>
         </div>
     </div>
@@ -134,13 +135,19 @@
     });
     </script>
     <script>
-        // Clear old service workers on every load to prevent stale cache issues
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(regs => {
-                regs.forEach(r => r.unregister());
-            });
-        }
-        caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(()=>{});
+        // Clear all caches, service workers, and storage on every load
+        (async function nuclearCacheClear() {
+            try {
+                // Unregister all service workers
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) await r.unregister();
+                }
+                // Delete all Cache API entries
+                const keys = await caches.keys();
+                for (const k of keys) await caches.delete(k);
+            } catch(e) {}
+        })();
 
         const CLIENT_VERSION = '1.3';
 
@@ -246,6 +253,36 @@
         }
         document.getElementById('refresh-btn').onclick = hardRefresh;
         document.querySelector('.refresh-btn-copy').onclick = hardRefresh;
+
+        async function nuclearReset() {
+            const btn = event.target;
+            btn.textContent = 'Clearing...';
+            try {
+                // 1. Unregister all service workers
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) await r.unregister();
+                }
+                // 2. Delete all Cache API entries
+                const keys = await caches.keys();
+                for (const k of keys) await caches.delete(k);
+                // 3. Clear localStorage
+                localStorage.clear();
+                // 4. Clear sessionStorage
+                sessionStorage.clear();
+                // 5. Delete all IndexedDB databases
+                if (indexedDB.databases) {
+                    const dbs = await indexedDB.databases();
+                    for (const db of dbs) indexedDB.deleteDatabase(db.name);
+                }
+                // 6. Clear cookies for this domain
+                document.cookie.split(';').forEach(c => {
+                    document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+                });
+            } catch(e) { console.error('Reset error:', e); }
+            // Force reload bypassing all caches
+            window.location.href = '/maayan/?reset=' + Date.now();
+        }
     </script>
 </body>
 </html>
