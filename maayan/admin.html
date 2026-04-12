@@ -966,6 +966,68 @@
             el.innerHTML=h;
         }); root.appendChild(s4.header); root.appendChild(s4.body);
 
+        // ===== 4.5 User Visibility Control =====
+        const sVis = makeSection('s-visibility', '👁️ Section Visibility per User', async el => {
+            let config = {};
+            try { config = await fetch(`${API_BASE}/config/load`).then(r=>r.json()); } catch(e) {}
+            const builtinOv = config.builtinOverrides || {};
+            const sections = await fetch(`${API_BASE}/sections/list`).then(r=>r.json()).catch(()=>[]);
+            const allSections = [
+                {id:'players', label:'⚽ Players', type:'builtin'},
+                {id:'funfacts', label:'🧠 Fun Facts', type:'builtin'},
+                ...sections.map(s => ({id:s.id, label:s.emoji+' '+s.label, type:'custom', sec:s}))
+            ];
+            const users = ['maayan','ofri','adam','boomerim'];
+            let h = '<table style="width:100%;font-size:0.8rem"><thead><tr><th style="text-align:right">Section</th>';
+            users.forEach(u => { h += '<th style="text-align:center">' + u + '</th>'; });
+            h += '</tr></thead><tbody>';
+            allSections.forEach(s => {
+                h += '<tr><td style="font-weight:700;padding:6px 4px">' + s.label + '</td>';
+                users.forEach(u => {
+                    let val = 'default';
+                    if (s.type === 'builtin') {
+                        val = (builtinOv[s.id] || {})[u] || 'default';
+                    } else {
+                        const idOv = (s.sec.identityOverrides || {})[u] || {};
+                        val = idOv.adminOverride !== undefined ? (idOv.adminOverride || 'auto') : 'default';
+                    }
+                    const onChange = s.type === 'builtin'
+                        ? 'saveBuiltinVis(&quot;'+s.id+'&quot;,&quot;'+u+'&quot;,this.value)'
+                        : 'saveCustomVis(&quot;'+s.id+'&quot;,&quot;'+u+'&quot;,this.value)';
+                    h += '<td style="text-align:center;padding:4px"><select onchange="'+onChange+'" style="padding:2px;font-size:0.7rem;border:1px solid #ddd;border-radius:3px">' +
+                        '<option value="default"'+(val==='default'?' selected':'')+'>Default</option>' +
+                        '<option value="show"'+(val==='show'?' selected':'')+'>Show</option>' +
+                        '<option value="hide"'+(val==='hide'?' selected':'')+'>Hide</option>' +
+                        '</select></td>';
+                });
+                h += '</tr>';
+            });
+            h += '</tbody></table>';
+            el.innerHTML = h;
+        });
+        root.appendChild(sVis.header); root.appendChild(sVis.body);
+
+        async function saveBuiltinVis(mode, uid, value) {
+            let config = {};
+            try { config = await fetch(`${API_BASE}/config/load`).then(r=>r.json()); } catch(e) {}
+            if (!config.builtinOverrides) config.builtinOverrides = {};
+            if (!config.builtinOverrides[mode]) config.builtinOverrides[mode] = {};
+            if (value === 'default') { delete config.builtinOverrides[mode][uid]; }
+            else { config.builtinOverrides[mode][uid] = value; }
+            await fetch(`${API_BASE}/config/save`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({builtinOverrides: config.builtinOverrides})});
+        }
+        async function saveCustomVis(sid, uid, value) {
+            const sections = await fetch(`${API_BASE}/sections/list`).then(r=>r.json()).catch(()=>[]);
+            const sec = sections.find(s=>s.id===sid);
+            if (!sec) return;
+            const overrides = sec.identityOverrides || {};
+            if (!overrides[uid]) overrides[uid] = {};
+            if (value === 'default') { delete overrides[uid].adminOverride; }
+            else { overrides[uid].adminOverride = value === 'auto' ? null : value; }
+            if (Object.keys(overrides[uid]).length === 0) delete overrides[uid];
+            await fetch(`${API_BASE}/sections/edit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:sid, identityOverrides:overrides})});
+        }
+
         // ===== 5. Custom Sections =====
         async function loadSections() {
             try { return await fetch(`${API_BASE}/sections/list`).then(r=>r.json()); } catch(e) { return []; }
