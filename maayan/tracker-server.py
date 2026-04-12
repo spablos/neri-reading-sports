@@ -630,9 +630,39 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_sections_list()
         elif path == '/state/load':
             self._handle_state_load()
+        elif path == '/fotmob/search':
+            self._handle_fotmob_search()
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_fotmob_search(self):
+        """Proxy FotMob search API to avoid CORS issues."""
+        from urllib.parse import urlparse, parse_qs
+        qs = parse_qs(urlparse(self.path).query)
+        query = qs.get('q', [''])[0]
+        if not query:
+            self._respond_json([])
+            return
+        try:
+            url = f'https://apigw.fotmob.com/searchapi/suggest?term={urllib.request.quote(query)}&lang=en'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+            results = []
+            for group in (data.get('squadMemberSuggest') or []):
+                for opt in group.get('options', []):
+                    payload = opt.get('payload', {})
+                    text_parts = opt.get('text', '').split('|')
+                    results.append({
+                        'id': payload.get('id') or (text_parts[1] if len(text_parts) > 1 else ''),
+                        'name': text_parts[0] if text_parts else '',
+                        'team': payload.get('teamName', ''),
+                    })
+            results = results[:12]
+            self._respond_json(results)
+        except:
+            self._respond_json([])
 
     def _handle_state_save(self):
         length = int(self.headers.get('Content-Length', 0))

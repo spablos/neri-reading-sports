@@ -396,44 +396,40 @@
         // ===== Add Player =====
         function toggleAddPlayerForm() {
             const form = document.getElementById('add-player-form');
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-            if (form.style.display === 'block') {
+            const visible = getComputedStyle(form).display !== 'none';
+            form.style.display = visible ? 'none' : 'block';
+            if (!visible) {
                 fetch(`${API_BASE}/players/nextid`).then(r=>r.json()).then(d=>{ document.getElementById('ap-id').value = d.nextId; });
             }
         }
-        // ===== FotMob search =====
+        // ===== FotMob search (proxied through server to avoid CORS) =====
         let _fotmobTimer = null;
         function searchFotmob(query) {
             clearTimeout(_fotmobTimer);
             const results = document.getElementById('ap-fotmob-results');
             if (query.length < 2) { results.style.display = 'none'; return; }
             _fotmobTimer = setTimeout(async () => {
+                results.innerHTML = '<div style="padding:10px;color:#999;text-align:center">Searching...</div>';
+                results.style.display = 'block';
                 try {
-                    const resp = await fetch(`https://www.fotmob.com/api/searchapi/suggest?term=${encodeURIComponent(query)}&lang=en`);
-                    const data = await resp.json();
-                    const players = (data.squadMemberSuggest || data.players || []).slice(0, 8);
-                    if (!players.length) { results.innerHTML = '<div style="padding:10px;color:#999;text-align:center">No results</div>'; results.style.display = 'block'; return; }
+                    const resp = await fetch(`${API_BASE}/fotmob/search?q=${encodeURIComponent(query)}`);
+                    const players = await resp.json();
+                    if (!players.length) { results.innerHTML = '<div style="padding:10px;color:#999;text-align:center">No results. Try a different spelling or use the ID field below.</div>'; return; }
                     let h = '';
                     players.forEach(p => {
-                        const pid = p.id || p.playerId;
-                        const name = p.name || p.firstName + ' ' + p.lastName;
-                        const team = p.teamName || p.team || '';
-                        const imgUrl = `https://images.fotmob.com/image_resources/playerimages/${pid}.png`;
-                        h += `<div onclick="selectFotmobPlayer(${pid},'${name.replace(/'/g,"\\'")}','${team.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background 0.15s" onmouseover="this.style.background='#E3F2FD'" onmouseout="this.style.background=''">
-                            <img src="${imgUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;background:#eee" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 36 36%22><circle cx=%2218%22 cy=%2218%22 r=%2218%22 fill=%22%23ddd%22/></svg>'">
-                            <div><div style="font-weight:700;font-size:0.9rem">${name}</div><div style="font-size:0.75rem;color:#888">${team}</div></div>
+                        const imgUrl = `https://images.fotmob.com/image_resources/playerimages/${p.id}.png`;
+                        const escName = (p.name||'').replace(/'/g,"\\'");
+                        const escTeam = (p.team||'').replace(/'/g,"\\'");
+                        h += `<div onclick="selectFotmobPlayer(${p.id},'${escName}','${escTeam}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background='#E3F2FD'" onmouseout="this.style.background=''">
+                            <img src="${imgUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:#eee" onerror="this.style.display='none'">
+                            <div><div style="font-weight:700;font-size:0.9rem">${p.name}</div><div style="font-size:0.75rem;color:#888">${p.team||''}</div></div>
                         </div>`;
                     });
                     results.innerHTML = h;
-                    results.style.display = 'block';
                 } catch(e) {
-                    results.innerHTML = `<div style="padding:10px;font-size:0.8rem;color:#888;text-align:center">
-                        Search unavailable. Enter FotMob ID manually:<br>
-                        <input id="ap-fotmob-manual" placeholder="FotMob ID" style="margin-top:6px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;width:120px" oninput="selectFotmobPlayer(parseInt(this.value)||0,'','')">
-                    </div>`;
-                    results.style.display = 'block';
+                    results.innerHTML = '<div style="padding:10px;color:#c00;text-align:center">Search failed. Use the FotMob ID field below instead.</div>';
                 }
-            }, 300);
+            }, 400);
         }
         function selectFotmobPlayer(pid, name, team) {
             document.getElementById('ap-fotmob').value = pid || '';
@@ -446,6 +442,15 @@
             if (team && !document.getElementById('ap-team').value) {
                 document.getElementById('ap-team').value = team;
             }
+            const directInput = document.getElementById('ap-fotmob-direct');
+            if (directInput) directInput.value = pid;
+        }
+        function previewFotmobId(val) {
+            const pid = parseInt(val);
+            if (!pid) return;
+            document.getElementById('ap-fotmob').value = pid;
+            const preview = document.getElementById('ap-fotmob-preview');
+            preview.innerHTML = `<img src="https://images.fotmob.com/image_resources/playerimages/${pid}.png" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<span style=\\'color:#c00;font-size:0.65rem\\'>Not found</span>'">`;
         }
         function updateColorPreview() {
             const c1 = document.getElementById('ap-color1').value;
@@ -462,7 +467,7 @@
                 name, fullName,
                 team: document.getElementById('ap-team').value.trim() || '',
                 number: parseInt(document.getElementById('ap-number').value) || 0,
-                fotmobId: document.getElementById('ap-fotmob').value.trim() || 'null',
+                fotmobId: document.getElementById('ap-fotmob').value.trim() || document.getElementById('ap-fotmob-direct').value.trim() || 'null',
                 colors: `['${document.getElementById('ap-color1').value}','${document.getElementById('ap-color2').value}']`,
                 description: document.getElementById('ap-desc').value.trim() || '',
             };
@@ -725,7 +730,11 @@
                         <span style="color:#ccc;font-size:0.7rem">No img</span>
                     </div>
                 </div>
-                <div id="ap-fotmob-results" style="display:none;max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;background:#fff;margin-top:4px"></div>
+                <div id="ap-fotmob-results" style="display:none;max-height:250px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;background:#fff;margin-top:4px"></div>
+                <div style="margin-top:4px;font-size:0.75rem;color:#888">
+                    Or enter ID directly: <input id="ap-fotmob-direct" placeholder="FotMob ID" style="width:80px;padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem" oninput="previewFotmobId(this.value)">
+                    · <a href="https://www.fotmob.com" target="_blank" style="color:#1976D2">Search on fotmob.com</a> (ID is in the URL)
+                </div>
                 <label>Team colors</label>
                 <div style="display:flex;gap:8px;align-items:center">
                     <input id="ap-color1" type="color" value="#4CAF50" style="width:50px;height:36px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px" onchange="updateColorPreview()">
