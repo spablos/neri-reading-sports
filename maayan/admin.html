@@ -304,6 +304,10 @@
                     body = { index: parseInt(el.dataset.milestoneIdx) };
                     body[el.dataset.milestoneField] = val;
                     url = `${API_BASE}/milestones`;
+                } else if (type === 'section-meta') {
+                    body = { id: el.dataset.sid };
+                    body[el.dataset.field] = val;
+                    url = `${API_BASE}/sections/edit`;
                 } else if (type === 'section-item') {
                     body = { sectionId: el.dataset.sid, itemId: parseInt(el.dataset.itemId) };
                     body[el.dataset.field] = val;
@@ -943,6 +947,38 @@
             const visible = getComputedStyle(form).display !== 'none';
             form.style.display = visible ? 'none' : 'block';
         }
+        function toggleEditSectionIcon(sid) {
+            const panel = document.getElementById('edit-icon-' + sid);
+            panel.style.display = panel.style.display === 'none' ? '' : 'none';
+        }
+        async function uploadSectionIcon(sid, input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const ext = file.name.split('.').pop().toLowerCase() || 'png';
+            const fname = 'section_' + sid + '.' + ext;
+            const resp = await fetch(`${API_BASE}/image/upload?name=${encodeURIComponent(fname)}`, { method: 'POST', body: file });
+            const d = await resp.json();
+            if (d.ok) {
+                document.getElementById('ei-emoji-' + sid).value = '';
+                document.getElementById('ei-emoji-' + sid).dataset.imgPath = d.path;
+                document.getElementById('sec-icon-' + sid).innerHTML = `<img src="${d.path}" style="width:1.2em;height:1.2em;object-fit:cover;border-radius:4px">`;
+            }
+        }
+        async function saveSectionIcon(sid) {
+            const emojiInput = document.getElementById('ei-emoji-' + sid);
+            const searchResults = document.getElementById('ei-results-' + sid);
+            let emoji = emojiInput.value.trim();
+            if (!emoji && emojiInput.dataset.imgPath) {
+                emoji = `<img src="${emojiInput.dataset.imgPath}" style="width:1.2em;height:1.2em;object-fit:cover;vertical-align:middle;border-radius:4px">`;
+            } else if (!emoji && searchResults && searchResults.dataset.selectedUrl) {
+                emoji = `<img src="${searchResults.dataset.selectedUrl}" style="width:1.2em;height:1.2em;object-fit:cover;vertical-align:middle;border-radius:4px">`;
+            }
+            if (!emoji) { alert('Enter an emoji or select an image'); return; }
+            await editSectionField(sid, 'emoji', emoji);
+            document.getElementById('sec-icon-' + sid).innerHTML = emoji;
+            document.getElementById('edit-icon-' + sid).style.display = 'none';
+            rebuildCustomSections();
+        }
         function previewSectionIcon(input) {
             if (!input.files || !input.files[0]) return;
             const reader = new FileReader();
@@ -1148,10 +1184,26 @@
 
             sections.forEach(sec => {
                 const ov = sec.adminOverride || 'auto';
+                const escEmoji = (sec.emoji||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
                 h += `<div style="background:#fff;border:2px solid #ddd;border-radius:12px;padding:12px;margin:12px 0">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                        <strong style="font-size:1.1rem">${sec.emoji} ${sec.label}</strong>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span id="sec-icon-${sec.id}" style="font-size:1.3rem;cursor:pointer;padding:4px;border:1px dashed transparent;border-radius:6px" onclick="toggleEditSectionIcon('${sec.id}')" title="Click to change icon">${sec.emoji}</span>
+                            <strong style="font-size:1.1rem" class="editable" onclick="startEdit(this)" data-edit-type="section-meta" data-sid="${sec.id}" data-field="label" data-val="${sec.label.replace(/'/g,"\\'")}">${sec.label}</strong>
+                        </div>
                         <button class="btn btn-del" style="width:28px;height:28px;font-size:0.7rem" onclick="deleteSection('${sec.id}')">🗑</button>
+                    </div>
+                    <div id="edit-icon-${sec.id}" style="display:none;margin-bottom:8px;padding:8px;border:1px solid #eee;border-radius:8px;background:#fafafa">
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                            <input id="ei-emoji-${sec.id}" placeholder="Emoji" value="${escEmoji}" style="width:50px;font-size:1.2rem;text-align:center;padding:4px;border:1px solid #ddd;border-radius:4px">
+                            <input placeholder="Search image..." style="flex:1;min-width:100px;font-size:0.8rem;padding:4px;border:1px solid #ddd;border-radius:4px" oninput="searchImages(this.value,'ei-results-${sec.id}')">
+                            <label style="padding:3px 8px;border-radius:4px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-size:0.75rem;white-space:nowrap">
+                                📷<input type="file" accept="image/*" style="display:none" onchange="uploadSectionIcon('${sec.id}',this)">
+                            </label>
+                            <button onclick="saveSectionIcon('${sec.id}')" style="padding:3px 10px;border-radius:4px;border:none;background:#4CAF50;color:#fff;cursor:pointer;font-size:0.8rem;font-weight:700">Save</button>
+                            <button onclick="document.getElementById('edit-icon-${sec.id}').style.display='none'" style="padding:3px 8px;border-radius:4px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-size:0.8rem">✕</button>
+                        </div>
+                        <div id="ei-results-${sec.id}" style="display:none;max-height:100px;overflow-y:auto;border:1px solid #eee;border-radius:6px;margin-top:4px"></div>
                     </div>
                     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:0.85rem">
                         <label>Threshold: <input type="number" value="${sec.threshold||0}" style="width:60px;padding:4px;border:1px solid #ddd;border-radius:4px" onchange="editSectionField('${sec.id}','threshold',this.value)"></label>
