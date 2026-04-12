@@ -186,8 +186,10 @@ class Game {
         this.currentPlayer = null;
         this.currentFact = null;    // current fun fact question
         this.mode = 'players';      // 'players' or 'funfacts'
+        this.activityType = 'drag'; // 'drag' or 'trace'
         this.tokens = [];
         this.dropZones = [];
+        this.tracingZones = [];
         this.dragState = null;
         this.isAnimating = false;
         this.audioPlayer = null;
@@ -706,6 +708,7 @@ class Game {
     // ===== Load player =====
     loadNextPlayer(specificPlayer) {
         this.stopAllAudio();
+        this.activityType = 'drag'; // players always use drag-and-drop
 
         this.currentPlayer = specificPlayer || this.pickNextPlayer();
         // Track as recent to prevent immediate repeat (especially after restore)
@@ -768,38 +771,36 @@ class Game {
             if (tok !== ' ') { soundByNameIdx[ni] = syllableSounds[li++]; }
         });
 
-        // Build drop zones grouped by word (so flex-wrap only breaks between words)
-        this.buildDropZones(nameTokens);
-
-        // Build draggable tokens (only letter tokens, not spaces)
-        this.dom.tokensContainer.innerHTML = '';
-        const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
-        const letterIndices = nameTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
-        const shuffledIndices = shuffle([...letterIndices]);
-        this.tokens = shuffledIndices.map(origIdx => {
-            const tok = nameTokens[origIdx];
-            const el = document.createElement('div');
-            const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
-            el.className = `token ${ballClass}`;
-            el.textContent = tok;
-            el.dataset.origIndex = origIdx;
-            el.dataset.text = tok;
-            this.dom.tokensContainer.appendChild(el);
-            return {
-                text: tok,
-                index: origIdx,
-                sound: soundByNameIdx[origIdx],
-                element: el,
-                originalX: 0, originalY: 0,
-                placed: false,
-            };
-        });
-
-        // Attach drag handlers to each token
-        this.tokens.forEach(t => this.attachDragToToken(t));
-
-        // Scatter across full screen after render
-        requestAnimationFrame(() => this.scatterTokens());
+        // Build challenge based on activity type
+        this.dom.app.classList.remove('tracing-active');
+        if (this.activityType === 'trace') {
+            this.buildTracingZones(nameTokens, soundByNameIdx);
+            this.dom.tokensContainer.innerHTML = '';
+            this.tokens = [];
+        } else {
+            this.buildDropZones(nameTokens);
+            // Build draggable tokens (only letter tokens, not spaces)
+            this.dom.tokensContainer.innerHTML = '';
+            const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
+            const letterIndices = nameTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
+            const shuffledIndices = shuffle([...letterIndices]);
+            this.tokens = shuffledIndices.map(origIdx => {
+                const tok = nameTokens[origIdx];
+                const el = document.createElement('div');
+                const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
+                el.className = `token ${ballClass}`;
+                el.textContent = tok;
+                el.dataset.origIndex = origIdx;
+                el.dataset.text = tok;
+                this.dom.tokensContainer.appendChild(el);
+                return {
+                    text: tok, index: origIdx, sound: soundByNameIdx[origIdx],
+                    element: el, originalX: 0, originalY: 0, placed: false,
+                };
+            });
+            this.tokens.forEach(t => this.attachDragToToken(t));
+            requestAnimationFrame(() => this.scatterTokens());
+        }
 
         // Hear name buttons — toggle play/stop
         const nameAudioSrc = `audio/names/${p.id}.mp3`;
@@ -847,6 +848,7 @@ class Game {
         this.currentFact = null;
         this.currentCustomItem = item;
         this.currentCustomSection = sectionId;
+        this.activityType = pool.section.activityType || 'drag';
 
         // Show question card
         this.dom.playerCard.style.display = 'none';
@@ -864,26 +866,32 @@ class Game {
             if (tok !== ' ') { soundByIdx[ni] = syllableSounds[li++]; }
         });
 
-        // Build drop zones and tokens
-        this.buildDropZones(answerTokens);
-        this.dom.tokensContainer.innerHTML = '';
-        const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
-        const letterIndices = answerTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
-        const shuffledIndices = shuffle([...letterIndices]);
-        this.tokens = shuffledIndices.map(origIdx => {
-            const tok = answerTokens[origIdx];
-            const el = document.createElement('div');
-            const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
-            el.className = `token ${ballClass}`;
-            el.textContent = tok;
-            el.dataset.origIndex = origIdx;
-            el.dataset.text = tok;
-            this.dom.tokensContainer.appendChild(el);
-            return { text: tok, index: origIdx, sound: soundByIdx[origIdx], element: el, originalX: 0, originalY: 0, placed: false };
-        });
-
-        this.tokens.forEach(t => this.attachDragToToken(t));
-        requestAnimationFrame(() => this.scatterTokens());
+        // Build challenge based on activity type
+        this.dom.app.classList.remove('tracing-active');
+        if (this.activityType === 'trace') {
+            this.buildTracingZones(answerTokens, soundByIdx);
+            this.dom.tokensContainer.innerHTML = '';
+            this.tokens = [];
+        } else {
+            this.buildDropZones(answerTokens);
+            this.dom.tokensContainer.innerHTML = '';
+            const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
+            const letterIndices = answerTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
+            const shuffledIndices = shuffle([...letterIndices]);
+            this.tokens = shuffledIndices.map(origIdx => {
+                const tok = answerTokens[origIdx];
+                const el = document.createElement('div');
+                const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
+                el.className = `token ${ballClass}`;
+                el.textContent = tok;
+                el.dataset.origIndex = origIdx;
+                el.dataset.text = tok;
+                this.dom.tokensContainer.appendChild(el);
+                return { text: tok, index: origIdx, sound: soundByIdx[origIdx], element: el, originalX: 0, originalY: 0, placed: false };
+            });
+            this.tokens.forEach(t => this.attachDragToToken(t));
+            requestAnimationFrame(() => this.scatterTokens());
+        }
 
         // Audio
         const promptAudio = `audio/sections/${sectionId}/prompt_${item.id}.mp3`;
@@ -902,6 +910,7 @@ class Game {
     // ===== Load Fun Fact =====
     loadNextFunFact(specificFact) {
         this.stopAllAudio();
+        this.activityType = 'drag'; // fun facts always use drag-and-drop
         if (specificFact) {
             this.currentFact = specificFact;
         } else {
@@ -932,33 +941,32 @@ class Game {
             if (tok !== ' ') { soundByIdx[ni] = syllableSounds[li++]; }
         });
 
-        // Build drop zones grouped by word
-        this.buildDropZones(answerTokens);
-
-        // Build tokens
-        this.dom.tokensContainer.innerHTML = '';
-        const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
-        const letterIndices = answerTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
-        const shuffledIndices = shuffle([...letterIndices]);
-        this.tokens = shuffledIndices.map(origIdx => {
-            const tok = answerTokens[origIdx];
-            const el = document.createElement('div');
-            const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
-            el.className = `token ${ballClass}`;
-            el.textContent = tok;
-            el.dataset.origIndex = origIdx;
-            el.dataset.text = tok;
-            this.dom.tokensContainer.appendChild(el);
-            return {
-                text: tok, index: origIdx, sound: soundByIdx[origIdx],
-                element: el, originalX: 0, originalY: 0, placed: false,
-            };
-        });
-
-        // Attach drag handlers to each token
-        this.tokens.forEach(t => this.attachDragToToken(t));
-
-        requestAnimationFrame(() => this.scatterTokens());
+        // Build challenge based on activity type
+        this.dom.app.classList.remove('tracing-active');
+        if (this.activityType === 'trace') {
+            this.buildTracingZones(answerTokens, soundByIdx);
+            this.dom.tokensContainer.innerHTML = '';
+            this.tokens = [];
+        } else {
+            this.buildDropZones(answerTokens);
+            this.dom.tokensContainer.innerHTML = '';
+            const ballTypes = ['ball-soccer', 'ball-basketball', 'ball-tennis'];
+            const letterIndices = answerTokens.map((t, i) => t !== ' ' ? i : null).filter(i => i !== null);
+            const shuffledIndices = shuffle([...letterIndices]);
+            this.tokens = shuffledIndices.map(origIdx => {
+                const tok = answerTokens[origIdx];
+                const el = document.createElement('div');
+                const ballClass = ballTypes[Math.floor(Math.random() * ballTypes.length)];
+                el.className = `token ${ballClass}`;
+                el.textContent = tok;
+                el.dataset.origIndex = origIdx;
+                el.dataset.text = tok;
+                this.dom.tokensContainer.appendChild(el);
+                return { text: tok, index: origIdx, sound: soundByIdx[origIdx], element: el, originalX: 0, originalY: 0, placed: false };
+            });
+            this.tokens.forEach(t => this.attachDragToToken(t));
+            requestAnimationFrame(() => this.scatterTokens());
+        }
 
         // Pre-generated audio paths for this fact
         const qAudio = `audio/funfacts/q${this.currentFact._origIdx}.mp3`;
@@ -987,6 +995,7 @@ class Game {
 
     // ===== Hint: reveal the next unfilled letter =====
     giveHint() {
+        if (this.activityType === 'trace') { this.giveTraceHint(); return; }
         const nextEmpty = this.dropZones.find(dz => !dz.filled);
         if (!nextEmpty) return;
         // Find the matching token
@@ -1053,6 +1062,195 @@ class Game {
             }
         });
         if (wordGroup.childElementCount) this.dom.dropZonesEl.appendChild(wordGroup);
+    }
+
+    // ===== Tracing Mode =====
+    buildTracingZones(tokens, soundByIdx) {
+        this.dom.dropZonesEl.innerHTML = '';
+        this.dropZones = [];
+        this.tracingZones = [];
+        this.dom.app.classList.add('tracing-active');
+
+        let wordGroup = document.createElement('div');
+        wordGroup.className = 'drop-zone-word';
+        tokens.forEach((tok, i) => {
+            if (tok === ' ') {
+                if (wordGroup.childElementCount) this.dom.dropZonesEl.appendChild(wordGroup);
+                const gap = document.createElement('div');
+                gap.className = 'drop-zone-gap';
+                this.dom.dropZonesEl.appendChild(gap);
+                wordGroup = document.createElement('div');
+                wordGroup.className = 'drop-zone-word';
+            } else {
+                const dz = document.createElement('div');
+                dz.className = 'drop-zone tracing-zone';
+                dz.dataset.index = i;
+                // Ghost letter
+                const ghost = document.createElement('span');
+                ghost.className = 'ghost-letter';
+                ghost.textContent = tok;
+                dz.appendChild(ghost);
+                // Canvas overlay
+                const canvas = document.createElement('canvas');
+                canvas.className = 'trace-canvas';
+                dz.appendChild(canvas);
+                wordGroup.appendChild(dz);
+
+                const zoneData = {
+                    element: dz, canvas, ghost, index: i,
+                    expected: tok, sound: soundByIdx ? soundByIdx[i] : null,
+                    done: false, drawing: false
+                };
+                this.dropZones.push({ element: dz, index: i, expected: tok, filled: false });
+                this.tracingZones.push(zoneData);
+            }
+        });
+        if (wordGroup.childElementCount) this.dom.dropZonesEl.appendChild(wordGroup);
+
+        // Initialize canvases after render
+        requestAnimationFrame(() => {
+            document.fonts.ready.then(() => this.initTracingCanvases());
+        });
+    }
+
+    initTracingCanvases() {
+        const dpr = window.devicePixelRatio || 1;
+        this.tracingZones.forEach(zone => {
+            const rect = zone.element.getBoundingClientRect();
+            const w = Math.round(rect.width);
+            const h = Math.round(rect.height);
+            // Size visible canvas
+            zone.canvas.width = w * dpr;
+            zone.canvas.height = h * dpr;
+            zone.ctx = zone.canvas.getContext('2d');
+            zone.ctx.scale(dpr, dpr);
+            zone.ctx.lineCap = 'round';
+            zone.ctx.lineJoin = 'round';
+            zone.ctx.lineWidth = Math.max(12, w * 0.25);
+            zone.ctx.strokeStyle = '#4CAF50';
+
+            // Create reference mask
+            zone.maskCanvas = document.createElement('canvas');
+            zone.maskCanvas.width = w;
+            zone.maskCanvas.height = h;
+            const mctx = zone.maskCanvas.getContext('2d');
+            // Get font from ghost letter computed style
+            const cs = getComputedStyle(zone.ghost);
+            mctx.font = `900 ${cs.fontSize} ${cs.fontFamily}`;
+            mctx.textAlign = 'center';
+            mctx.textBaseline = 'middle';
+            mctx.fillStyle = '#000';
+            mctx.fillText(zone.expected, w / 2, h / 2);
+            // Count letter pixels
+            const maskData = mctx.getImageData(0, 0, w, h).data;
+            let total = 0;
+            for (let p = 3; p < maskData.length; p += 16) { // sample every 4th pixel
+                if (maskData[p] > 0) total++;
+            }
+            zone.totalPixels = total;
+            zone.w = w;
+            zone.h = h;
+
+            // Attach drawing events
+            this.attachTraceEvents(zone);
+        });
+    }
+
+    attachTraceEvents(zone) {
+        const getPos = (e) => {
+            const r = zone.canvas.getBoundingClientRect();
+            const t = e.touches ? e.touches[0] : e;
+            return { x: t.clientX - r.left, y: t.clientY - r.top };
+        };
+        const onStart = (e) => {
+            if (zone.done) return;
+            e.preventDefault();
+            e.stopPropagation();
+            zone.drawing = true;
+            const pos = getPos(e);
+            zone.ctx.beginPath();
+            zone.ctx.moveTo(pos.x, pos.y);
+            if (zone.sound) this.playTokenSound(zone.sound);
+        };
+        const onMove = (e) => {
+            if (!zone.drawing || zone.done) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const pos = getPos(e);
+            zone.ctx.lineTo(pos.x, pos.y);
+            zone.ctx.stroke();
+            zone.ctx.beginPath();
+            zone.ctx.moveTo(pos.x, pos.y);
+        };
+        const onEnd = (e) => {
+            if (!zone.drawing || zone.done) return;
+            e.stopPropagation();
+            zone.drawing = false;
+            this.checkTraceCoverage(zone);
+        };
+        zone.canvas.addEventListener('mousedown', onStart);
+        zone.canvas.addEventListener('mousemove', onMove);
+        zone.canvas.addEventListener('mouseup', onEnd);
+        zone.canvas.addEventListener('mouseleave', onEnd);
+        zone.canvas.addEventListener('touchstart', onStart, { passive: false });
+        zone.canvas.addEventListener('touchmove', onMove, { passive: false });
+        zone.canvas.addEventListener('touchend', onEnd);
+    }
+
+    checkTraceCoverage(zone) {
+        const dpr = window.devicePixelRatio || 1;
+        const w = zone.w, h = zone.h;
+        // Get drawn pixels (sample from the canvas at 1x resolution)
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = w; tmpCanvas.height = h;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.drawImage(zone.canvas, 0, 0, w, h);
+        const drawnData = tmpCtx.getImageData(0, 0, w, h).data;
+        const maskData = zone.maskCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+        // Count overlap (sample every 4th pixel, matching totalPixels sampling)
+        let covered = 0;
+        for (let p = 3; p < maskData.length; p += 16) {
+            if (maskData[p] > 0 && drawnData[p] > 0) covered++;
+        }
+        const ratio = zone.totalPixels > 0 ? covered / zone.totalPixels : 0;
+        if (ratio >= 0.55) {
+            this.handleTraceComplete(zone);
+        }
+    }
+
+    handleTraceComplete(zone) {
+        zone.done = true;
+        zone.element.classList.add('filled');
+        // Find matching dropZone and mark filled
+        const dz = this.dropZones.find(d => d.index === zone.index);
+        if (dz) dz.filled = true;
+        // Score + feedback
+        SFX.correctDing();
+        this.score++;
+        this.updateScore();
+        this.showStarBurst(zone.element);
+        this.showFeedback('correct');
+        // Check if all done
+        if (this.tracingZones.every(z => z.done)) {
+            setTimeout(() => this.handleNameComplete(), 400);
+        }
+    }
+
+    // Hint for tracing mode: auto-fill a letter
+    giveTraceHint() {
+        const nextZone = this.tracingZones.find(z => !z.done);
+        if (!nextZone) return;
+        // Draw the letter shape on the canvas
+        const dpr = window.devicePixelRatio || 1;
+        nextZone.ctx.save();
+        const cs = getComputedStyle(nextZone.ghost);
+        nextZone.ctx.font = `900 ${cs.fontSize} ${cs.fontFamily}`;
+        nextZone.ctx.textAlign = 'center';
+        nextZone.ctx.textBaseline = 'middle';
+        nextZone.ctx.fillStyle = '#4CAF50';
+        nextZone.ctx.fillText(nextZone.expected, nextZone.w / 2, nextZone.h / 2);
+        nextZone.ctx.restore();
+        this.handleTraceComplete(nextZone);
     }
 
     // ===== Scatter tokens across the screen, avoiding all UI elements =====

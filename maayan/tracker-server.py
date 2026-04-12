@@ -793,6 +793,7 @@ class Handler(BaseHTTPRequestHandler):
             'threshold': int(data.get('threshold', 0)),
             'adminOverride': data.get('adminOverride', None),
             'ordering': data.get('ordering', 'random'),
+            'activityType': data.get('activityType', 'drag'),
             'items': []
         }
         sections.append(section)
@@ -814,6 +815,7 @@ class Handler(BaseHTTPRequestHandler):
                 if 'threshold' in data: sec['threshold'] = int(data['threshold'])
                 if 'adminOverride' in data: sec['adminOverride'] = data['adminOverride'] if data['adminOverride'] != 'auto' else None
                 if 'ordering' in data: sec['ordering'] = data['ordering']
+                if 'activityType' in data: sec['activityType'] = data['activityType']
                 self._write_sections(sections)
                 self._respond_json({'ok': True})
                 return

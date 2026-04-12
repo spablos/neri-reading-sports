@@ -951,7 +951,8 @@
             const finalId = id || label.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '').slice(0, 20) || ('sec_' + Date.now());
             const threshold = parseInt(document.getElementById('as-threshold').value) || 0;
             const ordering = document.getElementById('as-ordering').value || 'random';
-            const resp = await fetch(`${API_BASE}/sections/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: finalId, label, emoji, threshold, ordering})});
+            const activityType = document.getElementById('as-activity').value || 'drag';
+            const resp = await fetch(`${API_BASE}/sections/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: finalId, label, emoji, threshold, ordering, activityType})});
             const d = await resp.json();
             if (d.ok) {
                 document.getElementById('add-section-form').style.display = 'none';
@@ -1104,6 +1105,7 @@
                 <div style="display:flex;gap:12px;margin-top:8px">
                     <label style="flex:1">Score threshold <input id="as-threshold" type="number" value="0" style="width:100%"></label>
                     <label style="flex:1">Ordering <select id="as-ordering" style="width:100%"><option value="random">Random</option><option value="sequential">Sequential</option></select></label>
+                    <label style="flex:1">Activity <select id="as-activity" style="width:100%"><option value="drag">Drag & Drop</option><option value="trace">Letter Tracing</option></select></label>
                 </div>
                 <div class="form-actions">
                     <button onclick="submitAddSection()" style="background:#4CAF50;color:#fff">Create Section</button>
@@ -1128,6 +1130,10 @@
                         <label>Order: <select onchange="editSectionField('${sec.id}','ordering',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:4px">
                             <option value="random" ${sec.ordering==='random'?'selected':''}>Random</option>
                             <option value="sequential" ${sec.ordering==='sequential'?'selected':''}>Sequential</option>
+                        </select></label>
+                        <label>Activity: <select onchange="editSectionField('${sec.id}','activityType',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:4px">
+                            <option value="drag" ${(sec.activityType||'drag')==='drag'?'selected':''}>Drag & Drop</option>
+                            <option value="trace" ${sec.activityType==='trace'?'selected':''}>Letter Tracing</option>
                         </select></label>
                     </div>
                     <div style="margin:8px 0;display:flex;gap:6px">
