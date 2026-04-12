@@ -980,19 +980,21 @@
             if (!sec) return;
             const container = document.querySelector(`[data-section-items="${sid}"]`);
             if (!container) return;
-            let h='<table><thead><tr><th>#</th><th>Prompt</th><th>Answer</th><th>Audio</th><th></th></tr></thead><tbody>';
+            let h='<table><thead><tr><th>#</th><th>Content</th><th>Audio</th><th></th></tr></thead><tbody>';
             sec.items.forEach((item,i) => {
                 const escP = (item.prompt||'').replace(/'/g,"\\'");
                 const escA = (item.answer||'').replace(/'/g,"\\'");
                 h+=`<tr>
-                    <td>${item.priority||i+1}</td>
+                    <td rowspan="2" style="vertical-align:middle">${item.priority||i+1}</td>
                     <td class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="prompt" data-val="${escP}" style="direction:rtl;font-weight:700">${item.prompt||'-'}</td>
-                    <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="answer" data-val="${escA}">${item.answer}</span></td>
-                    <td class="ab">
-                        <span style="font-size:0.6rem;color:#888">P</span><button class="btn btn-play" style="width:24px;height:24px;font-size:0.65rem" onclick="pam('audio/sections/${sid}/prompt_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" style="width:24px;height:24px;font-size:0.65rem" onclick="rec('sections/${sid}/prompt_${item.id}.mp3',this)">🎙</button>
-                        <span style="font-size:0.6rem;color:#888;margin-left:4px">A</span><button class="btn btn-play" style="width:24px;height:24px;font-size:0.65rem" onclick="pam('audio/sections/${sid}/answer_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" style="width:24px;height:24px;font-size:0.65rem" onclick="rec('sections/${sid}/answer_${item.id}.mp3',this)">🎙</button>
+                    <td><span style="font-size:0.7rem;color:#888;margin-left:4px">Q</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/prompt_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/prompt_${item.id}.mp3',this)">🎙</button></span></td>
+                    <td rowspan="2" style="vertical-align:middle;text-align:center">
+                        <button class="btn btn-del" style="width:28px;height:28px;font-size:0.7rem" onclick="deleteSectionItem('${sid}',${item.id})">🗑</button>
                     </td>
-                    <td><button class="btn btn-del" style="width:24px;height:24px;font-size:0.6rem" onclick="deleteSectionItem('${sid}',${item.id})">🗑</button></td>
+                </tr>
+                <tr style="border-bottom:2px solid #ddd">
+                    <td class="name-nikud" style="direction:rtl"><span class="editable" onclick="startEdit(this)" data-edit-type="section-item" data-sid="${sid}" data-item-id="${item.id}" data-field="answer" data-val="${escA}">${item.answer}</span></td>
+                    <td><span style="font-size:0.7rem;color:#888;margin-left:4px">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/sections/${sid}/answer_${item.id}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('sections/${sid}/answer_${item.id}.mp3',this)">🎙</button></span></td>
                 </tr>`;
             });
             h+='</tbody></table>';
