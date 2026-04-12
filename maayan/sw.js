@@ -1,5 +1,5 @@
 // Service Worker for מעין לומד לקרוא — caches all assets for offline play
-const CACHE_NAME = 'maayan-v2';
+const CACHE_NAME = 'maayan-v3';
 
 // Core app files
 const CORE_FILES = [
@@ -37,6 +37,9 @@ self.addEventListener('activate', event => {
 // Fetch: cache-first for audio, network-first for everything else
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
+
+    // External URLs: don't intercept (FotMob images, ESPN logos, etc.)
+    if (url.origin !== self.location.origin) return;
 
     // API calls and version.json: always network (never cache)
     if (url.pathname.includes('/api/') || url.pathname.endsWith('version.json')) {
