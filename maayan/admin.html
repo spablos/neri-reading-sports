@@ -1244,17 +1244,18 @@
                         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;padding:6px;background:#fafafa;border-radius:6px">
                         ${['maayan','ofri','adam','boomerim'].map(uid => {
                             const idOv = (sec.identityOverrides||{})[uid] || {};
-                            const idVis = idOv.adminOverride !== undefined ? idOv.adminOverride || 'auto' : 'default';
+                            const idVis = idOv.adminOverride !== undefined ? (idOv.adminOverride || 'auto') : 'default';
                             const idThr = idOv.threshold !== undefined ? idOv.threshold : '';
+                            const sid = sec.id;
                             return '<div style="border:1px solid #eee;border-radius:6px;padding:4px 8px;background:#fff">' +
                                 '<div style="font-weight:700;margin-bottom:2px">' + uid + '</div>' +
-                                '<select onchange="editIdentityOverride(\\''+sec.id+'\\',\\''+uid+'\\',\\'adminOverride\\',this.value)" style="padding:2px;font-size:0.75rem;border:1px solid #ddd;border-radius:3px">' +
+                                '<select onchange="editIdentityOverride(&quot;'+sid+'&quot;,&quot;'+uid+'&quot;,&quot;adminOverride&quot;,this.value)" style="padding:2px;font-size:0.75rem;border:1px solid #ddd;border-radius:3px">' +
                                 '<option value="default"' + (idVis==='default'?' selected':'') + '>Default</option>' +
                                 '<option value="auto"' + (idVis==='auto'?' selected':'') + '>Auto</option>' +
                                 '<option value="show"' + (idVis==='show'?' selected':'') + '>Show</option>' +
                                 '<option value="hide"' + (idVis==='hide'?' selected':'') + '>Hide</option>' +
                                 '</select> ' +
-                                '<input type="number" placeholder="Thr" value="' + idThr + '" style="width:45px;padding:2px;font-size:0.75rem;border:1px solid #ddd;border-radius:3px" onchange="editIdentityOverride(\\''+sec.id+'\\',\\''+uid+'\\',\\'threshold\\',this.value)">' +
+                                '<input type="number" placeholder="Thr" value="' + idThr + '" style="width:45px;padding:2px;font-size:0.75rem;border:1px solid #ddd;border-radius:3px" onchange="editIdentityOverride(&quot;'+sid+'&quot;,&quot;'+uid+'&quot;,&quot;threshold&quot;,this.value)">' +
                                 '</div>';
                         }).join('')}
                         </div>
