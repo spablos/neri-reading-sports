@@ -1,7 +1,7 @@
 // players.js — Soccer players for Maayan's reading game
 // Focus: Maccabi Netanya, Israeli National Team, Top European Stars
 
-const FMOB_IMG = id => `https://images.fotmob.com/image_resources/playerimages/${id}.png`;
+const FMOB_IMG = id => `/maayan/api/fotmob/img/${id}.png`;
 const SOCCER_LOGO = espnId => `https://a.espncdn.com/i/teamlogos/soccer/500/${espnId}.png`;
 
 // Team metadata: Hebrew name → { en, logo }

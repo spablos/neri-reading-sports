@@ -640,7 +640,33 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_image_search()
         elif path == '/config/load':
             self._handle_config_load()
+        elif path.startswith('/fotmob/img/'):
+            self._handle_fotmob_img()
         else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _handle_fotmob_img(self):
+        """Proxy FotMob player images to avoid hotlink blocking."""
+        # Extract player ID from path: /fotmob/img/12345.png
+        parts = self.path.split('/')
+        filename = parts[-1].split('?')[0] if parts else ''
+        if not filename:
+            self.send_response(404)
+            self.end_headers()
+            return
+        try:
+            url = f'https://images.fotmob.com/image_resources/playerimages/{filename}'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = resp.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/png')
+                self.send_header('Cache-Control', 'public, max-age=86400')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(data)
+        except:
             self.send_response(404)
             self.end_headers()
 
