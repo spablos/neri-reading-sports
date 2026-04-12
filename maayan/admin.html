@@ -535,19 +535,41 @@
         // ===== Add Fun Fact =====
         function toggleAddFunFactForm() {
             const form = document.getElementById('add-ff-form');
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            const visible = getComputedStyle(form).display !== 'none';
+            form.style.display = visible ? 'none' : 'block';
         }
-        function submitAddFunFact() {
+        function toggleCustomCategory() {
+            const sel = document.getElementById('ff-cat');
+            const custom = document.getElementById('ff-cat-custom');
+            if (sel.value === '_custom') {
+                custom.style.display = '';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+            }
+        }
+        async function submitAddFunFact() {
             const q = document.getElementById('ff-q').value.trim();
             const a = document.getElementById('ff-a').value.trim();
             if (!q || !a) { alert('Question and answer are required'); return; }
-            const category = document.getElementById('ff-cat').value || 'general';
+            const sel = document.getElementById('ff-cat');
+            const category = sel.value === '_custom'
+                ? (document.getElementById('ff-cat-custom').value.trim() || 'general')
+                : (sel.value || 'general');
+            // Upload image if selected
+            const newIdx = (typeof FUN_FACTS!=='undefined' ? FUN_FACTS.length : 0) + 1;
+            const imgInput = document.getElementById('ff-img');
+            let imgPath = null;
+            if (imgInput && imgInput.files && imgInput.files[0]) {
+                const file = imgInput.files[0];
+                const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+                const resp = await fetch(`${API_BASE}/image/upload?name=${encodeURIComponent('funfact_' + newIdx + '.' + ext)}`, { method: 'POST', body: file });
+                const d = await resp.json();
+                if (d.ok) imgPath = d.path;
+            }
             fetch(`${API_BASE}/funfacts/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q,a,category})})
             .then(r=>r.json()).then(d=>{
                 if(!d.ok) { alert('Failed: '+(d.error||'')); return; }
-                // Count what the new index will be (current count + 1)
-                const newIdx = (typeof FUN_FACTS!=='undefined' ? FUN_FACTS.length : 0) + 1;
-                // Show inline recording area
                 const recArea = document.getElementById('ff-rec-area');
                 recArea.style.display = 'block';
                 recArea.innerHTML = `<h3 style="margin:10px 0;color:#333">Fun fact #${newIdx} added! Record audio:</h3>
@@ -557,8 +579,8 @@
                     <tr><td class="name-nikud" style="direction:rtl">${a}</td>
                         <td><span style="font-size:0.7rem;color:#888">A</span> <span class="ab"><button class="btn btn-play" onclick="pam('audio/funfacts/a${newIdx}.mp3',this)">▶</button><button class="btn btn-rec" onclick="rec('funfacts/a${newIdx}.mp3',this)">🎙</button></span></td></tr>
                     </tbody></table>
+                    ${imgPath ? '<div style="margin:8px 0;font-size:0.85rem;color:#4CAF50">Image uploaded: ' + imgPath + '</div>' : ''}
                     <button onclick="location.reload()" style="padding:8px 20px;border-radius:8px;border:none;background:#333;color:#fff;cursor:pointer;margin-top:8px">Done — reload page</button>`;
-                // Hide the input form
                 document.getElementById('add-ff-form').style.display = 'none';
             });
         }
@@ -841,16 +863,22 @@
             <div class="add-form" id="add-ff-form">
                 <label class="required">Question (Hebrew)</label><input id="ff-q" placeholder="e.g. ?מי זכתה בגביע העולם ב-2022">
                 <label class="required">Answer with nikud</label><input id="ff-a" placeholder="e.g. אַרְגֶּנְטִינָה">
+                <label>Image (optional)</label>
+                <input type="file" id="ff-img" accept="image/*" style="font-size:0.85rem">
+                <div style="font-size:0.75rem;color:#888;margin-top:2px">JPG or PNG — shown alongside the question</div>
                 <label>Category</label>
-                <select id="ff-cat" style="direction:ltr;text-align:left">
-                    <option value="worldcup">🏆 World Cup</option>
-                    <option value="champions">⚽ Champions League</option>
-                    <option value="israel">🇮🇱 Israel</option>
-                    <option value="netanya">💎 Netanya</option>
-                    <option value="nba">🏀 NBA</option>
-                    <option value="neri">⭐ Neri</option>
-                    <option value="general">General</option>
-                </select>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <select id="ff-cat" style="direction:ltr;text-align:left;flex:1" onchange="toggleCustomCategory()">
+                        <option value="worldcup">🏆 World Cup</option>
+                        <option value="champions">⚽ Champions League</option>
+                        <option value="israel">🇮🇱 Israel</option>
+                        <option value="netanya">💎 Netanya</option>
+                        <option value="nba">🏀 NBA</option>
+                        <option value="general">📋 General</option>
+                        <option value="_custom">✏️ Custom...</option>
+                    </select>
+                    <input id="ff-cat-custom" placeholder="Category name" style="display:none;flex:1">
+                </div>
                 <div class="form-actions">
                     <button onclick="submitAddFunFact()" style="background:#4CAF50;color:#fff">Add Fun Fact</button>
                     <button onclick="toggleAddFunFactForm()" style="background:#eee;color:#333">Cancel</button>
