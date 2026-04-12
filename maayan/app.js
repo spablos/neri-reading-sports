@@ -1164,6 +1164,9 @@ class Game {
     }
 
     attachTraceEvents(zone) {
+        zone.totalStrokeLen = 0;
+        zone.lastPos = null;
+        zone.strokeCount = 0;
         const getPos = (e) => {
             const r = zone.canvas.getBoundingClientRect();
             const t = e.touches ? e.touches[0] : e;
@@ -1174,7 +1177,9 @@ class Game {
             e.preventDefault();
             e.stopPropagation();
             zone.drawing = true;
+            zone.strokeCount++;
             const pos = getPos(e);
+            zone.lastPos = pos;
             zone.ctx.beginPath();
             zone.ctx.moveTo(pos.x, pos.y);
         };
@@ -1183,6 +1188,13 @@ class Game {
             e.preventDefault();
             e.stopPropagation();
             const pos = getPos(e);
+            // Track total distance drawn
+            if (zone.lastPos) {
+                const dx = pos.x - zone.lastPos.x;
+                const dy = pos.y - zone.lastPos.y;
+                zone.totalStrokeLen += Math.sqrt(dx * dx + dy * dy);
+            }
+            zone.lastPos = pos;
             zone.ctx.lineTo(pos.x, pos.y);
             zone.ctx.stroke();
             zone.ctx.beginPath();
@@ -1192,9 +1204,10 @@ class Game {
             if (!zone.drawing || zone.done) return;
             e.stopPropagation();
             zone.drawing = false;
-            // Check coverage after a short pause (let the child lift finger)
+            zone.lastPos = null;
+            // Check if enough drawing has been done
             clearTimeout(zone._checkTimer);
-            zone._checkTimer = setTimeout(() => this.checkTraceCoverage(zone), 300);
+            zone._checkTimer = setTimeout(() => this.checkTraceCompletion(zone), 400);
         };
         zone.canvas.addEventListener('mousedown', onStart);
         zone.canvas.addEventListener('mousemove', onMove);
@@ -1205,23 +1218,13 @@ class Game {
         zone.canvas.addEventListener('touchend', onEnd);
     }
 
-    checkTraceCoverage(zone) {
-        const dpr = window.devicePixelRatio || 1;
-        const w = zone.w, h = zone.h;
-        // Get drawn pixels (sample from the canvas at 1x resolution)
-        const tmpCanvas = document.createElement('canvas');
-        tmpCanvas.width = w; tmpCanvas.height = h;
-        const tmpCtx = tmpCanvas.getContext('2d');
-        tmpCtx.drawImage(zone.canvas, 0, 0, w, h);
-        const drawnData = tmpCtx.getImageData(0, 0, w, h).data;
-        const maskData = zone.maskCanvas.getContext('2d').getImageData(0, 0, w, h).data;
-        // Count overlap (sample every 4th pixel, matching totalPixels sampling)
-        let covered = 0;
-        for (let p = 3; p < maskData.length; p += 16) {
-            if (maskData[p] > 0 && drawnData[p] > 0) covered++;
-        }
-        const ratio = zone.totalPixels > 0 ? covered / zone.totalPixels : 0;
-        if (ratio >= 0.25) {
+    checkTraceCompletion(zone) {
+        // Path-based detection: check if total stroke length is sufficient
+        // relative to the letter zone size. A traced letter typically requires
+        // strokes totaling ~1.5-3x the zone's diagonal.
+        const diagonal = Math.sqrt(zone.w * zone.w + zone.h * zone.h);
+        const minStrokeLen = diagonal * 0.6; // ~60% of diagonal = minimal effort
+        if (zone.totalStrokeLen >= minStrokeLen && zone.strokeCount >= 1) {
             this.handleTraceComplete(zone);
         }
     }
