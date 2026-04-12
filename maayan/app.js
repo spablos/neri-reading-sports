@@ -1122,6 +1122,7 @@ class Game {
 
     initTracingCanvases() {
         const dpr = window.devicePixelRatio || 1;
+        const GRID = 7; // 7x7 grid for structural matching
         this.tracingZones.forEach(zone => {
             const rect = zone.element.getBoundingClientRect();
             const w = Math.round(rect.width);
@@ -1133,30 +1134,44 @@ class Game {
             zone.ctx.scale(dpr, dpr);
             zone.ctx.lineCap = 'round';
             zone.ctx.lineJoin = 'round';
-            zone.ctx.lineWidth = 2;
+            zone.ctx.lineWidth = 1.5;
             zone.ctx.strokeStyle = '#7B1FA2';
 
-            // Create reference mask
-            zone.maskCanvas = document.createElement('canvas');
-            zone.maskCanvas.width = w;
-            zone.maskCanvas.height = h;
-            const mctx = zone.maskCanvas.getContext('2d');
-            // Get font from ghost letter computed style
+            // Render reference letter on offscreen canvas
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = w;
+            maskCanvas.height = h;
+            const mctx = maskCanvas.getContext('2d');
             const cs = getComputedStyle(zone.ghost);
             mctx.font = `900 ${cs.fontSize} ${cs.fontFamily}`;
             mctx.textAlign = 'center';
             mctx.textBaseline = 'middle';
             mctx.fillStyle = '#000';
             mctx.fillText(zone.expected, w / 2, h / 2);
-            // Count letter pixels
+
+            // Build reference grid: which cells contain letter ink
             const maskData = mctx.getImageData(0, 0, w, h).data;
-            let total = 0;
-            for (let p = 3; p < maskData.length; p += 16) { // sample every 4th pixel
-                if (maskData[p] > 0) total++;
+            const cellW = w / GRID, cellH = h / GRID;
+            zone.refGrid = [];
+            zone.refCellCount = 0;
+            for (let gy = 0; gy < GRID; gy++) {
+                for (let gx = 0; gx < GRID; gx++) {
+                    let hasInk = false;
+                    const x0 = Math.floor(gx * cellW), y0 = Math.floor(gy * cellH);
+                    const x1 = Math.floor((gx + 1) * cellW), y1 = Math.floor((gy + 1) * cellH);
+                    for (let y = y0; y < y1 && !hasInk; y += 2) {
+                        for (let x = x0; x < x1 && !hasInk; x += 2) {
+                            if (maskData[(y * w + x) * 4 + 3] > 0) hasInk = true;
+                        }
+                    }
+                    zone.refGrid.push(hasInk);
+                    if (hasInk) zone.refCellCount++;
+                }
             }
-            zone.totalPixels = total;
             zone.w = w;
             zone.h = h;
+            zone.gridSize = GRID;
+            zone.maskCanvas = maskCanvas;
 
             // Attach drawing events
             this.attachTraceEvents(zone);
@@ -1219,12 +1234,39 @@ class Game {
     }
 
     checkTraceCompletion(zone) {
-        // Path-based detection: check if total stroke length is sufficient
-        // relative to the letter zone size. A traced letter typically requires
-        // strokes totaling ~1.5-3x the zone's diagonal.
-        const diagonal = Math.sqrt(zone.w * zone.w + zone.h * zone.h);
-        const minStrokeLen = diagonal * 0.6; // ~60% of diagonal = minimal effort
-        if (zone.totalStrokeLen >= minStrokeLen && zone.strokeCount >= 1) {
+        // Grid-based structural matching:
+        // Divide the canvas into a 7x7 grid. Check which grid cells have
+        // drawn ink and compare against the reference letter's grid.
+        // This is equivalent to what a simple CNN's first layer computes.
+        const dpr = window.devicePixelRatio || 1;
+        const w = zone.w, h = zone.h, G = zone.gridSize;
+        // Sample the drawn canvas at 1x resolution
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = w; tmpCanvas.height = h;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.drawImage(zone.canvas, 0, 0, w, h);
+        const drawnData = tmpCtx.getImageData(0, 0, w, h).data;
+        // Build drawn grid
+        const cellW = w / G, cellH = h / G;
+        let matchedCells = 0;
+        for (let gy = 0; gy < G; gy++) {
+            for (let gx = 0; gx < G; gx++) {
+                const idx = gy * G + gx;
+                if (!zone.refGrid[idx]) continue; // only check cells where letter exists
+                let hasInk = false;
+                const x0 = Math.floor(gx * cellW), y0 = Math.floor(gy * cellH);
+                const x1 = Math.floor((gx + 1) * cellW), y1 = Math.floor((gy + 1) * cellH);
+                for (let y = y0; y < y1 && !hasInk; y += 2) {
+                    for (let x = x0; x < x1 && !hasInk; x += 2) {
+                        if (drawnData[(y * w + x) * 4 + 3] > 0) hasInk = true;
+                    }
+                }
+                if (hasInk) matchedCells++;
+            }
+        }
+        // Letter is recognized when 40% of reference cells are covered
+        const coverage = zone.refCellCount > 0 ? matchedCells / zone.refCellCount : 0;
+        if (coverage >= 0.4 && zone.strokeCount >= 1) {
             this.handleTraceComplete(zone);
         }
     }
