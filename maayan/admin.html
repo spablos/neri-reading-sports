@@ -943,12 +943,34 @@
             const visible = getComputedStyle(form).display !== 'none';
             form.style.display = visible ? 'none' : 'block';
         }
+        function previewSectionIcon(input) {
+            if (!input.files || !input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.getElementById('as-icon-preview');
+                preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+            };
+            reader.readAsDataURL(input.files[0]);
+            document.getElementById('as-emoji').value = ''; // clear emoji since using image
+        }
         async function submitAddSection() {
             const label = document.getElementById('as-label').value.trim();
-            const emoji = document.getElementById('as-emoji').value.trim() || '📖';
+            let emoji = document.getElementById('as-emoji').value.trim() || '📖';
             const id = document.getElementById('as-id').value.trim();
             if (!label) { alert('Section name is required'); return; }
             const finalId = id || label.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '').slice(0, 20) || ('sec_' + Date.now());
+            // Handle icon: upload file, search selection, or emoji
+            const iconFile = document.getElementById('as-icon-file');
+            const iconResults = document.getElementById('as-icon-results');
+            if (iconFile && iconFile.files && iconFile.files[0]) {
+                const file = iconFile.files[0];
+                const ext = file.name.split('.').pop().toLowerCase() || 'png';
+                const resp = await fetch(`${API_BASE}/image/upload?name=${encodeURIComponent('section_' + finalId + '.' + ext)}`, { method: 'POST', body: file });
+                const d = await resp.json();
+                if (d.ok) emoji = `<img src="${d.path}" style="width:1.2em;height:1.2em;object-fit:cover;vertical-align:middle;border-radius:4px">`;
+            } else if (iconResults && iconResults.dataset.selectedUrl) {
+                emoji = `<img src="${iconResults.dataset.selectedUrl}" style="width:1.2em;height:1.2em;object-fit:cover;vertical-align:middle;border-radius:4px">`;
+            }
             const threshold = parseInt(document.getElementById('as-threshold').value) || 0;
             const ordering = document.getElementById('as-ordering').value || 'random';
             const activityType = document.getElementById('as-activity').value || 'drag';
@@ -1100,7 +1122,18 @@
             let h = `<div class="toolbar"><button onclick="toggleAddSectionForm()" style="background:#E8F5E9;color:#2E7D32;border-color:#4CAF50;font-weight:700">+ New Section</button></div>
             <div class="add-form" id="add-section-form">
                 <label class="required">Section name (Hebrew)</label><input id="as-label" placeholder="e.g. חיות">
-                <label>Emoji icon</label><input id="as-emoji" placeholder="e.g. 🐾" value="📖" style="font-size:1.3rem">
+                <label>Section icon</label>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+                    <input id="as-emoji" placeholder="e.g. 🐾" value="📖" style="font-size:1.3rem;width:60px;text-align:center">
+                    <span style="font-size:0.8rem;color:#888">or</span>
+                    <input id="as-icon-search" placeholder="Search icon image..." style="flex:1;font-size:0.85rem" oninput="searchImages(this.value,'as-icon-results')">
+                    <span style="font-size:0.8rem;color:#888">or</span>
+                    <label style="padding:4px 10px;border-radius:6px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-size:0.8rem;white-space:nowrap">
+                        📷 Upload<input type="file" id="as-icon-file" accept="image/*" style="display:none" onchange="previewSectionIcon(this)">
+                    </label>
+                    <div id="as-icon-preview" style="width:40px;height:40px;border-radius:8px;border:1px solid #ddd;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:1.3rem">📖</div>
+                </div>
+                <div id="as-icon-results" style="display:none;max-height:120px;overflow-y:auto;border:1px solid #eee;border-radius:6px;margin-bottom:6px"></div>
                 <label>Section ID (English, auto-generated if empty)</label><input id="as-id" placeholder="e.g. animals">
                 <div style="display:flex;gap:12px;margin-top:8px">
                     <label style="flex:1">Score threshold <input id="as-threshold" type="number" value="0" style="width:100%"></label>
