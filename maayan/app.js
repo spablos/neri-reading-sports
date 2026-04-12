@@ -1133,7 +1133,7 @@ class Game {
             zone.ctx.scale(dpr, dpr);
             zone.ctx.lineCap = 'round';
             zone.ctx.lineJoin = 'round';
-            zone.ctx.lineWidth = Math.max(2, w * 0.03);
+            zone.ctx.lineWidth = 2;
             zone.ctx.strokeStyle = '#7B1FA2';
 
             // Create reference mask
