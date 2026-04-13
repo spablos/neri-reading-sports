@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <defs>
+    <linearGradient id="mg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2C2C2C"/>
+      <stop offset="100%" style="stop-color:#1A1A1A"/>
+    </linearGradient>
+  </defs>
+  <!-- Hood/head shape -->
+  <path d="M30,6 C18,6 10,14 10,26 L10,34 C10,42 18,50 30,54 C42,50 50,42 50,34 L50,26 C50,14 42,6 30,6Z" fill="url(#mg)" stroke="#000" stroke-width="1.5"/>
+  <!-- Mask band (eye slit) -->
+  <rect x="10" y="24" width="40" height="10" rx="3" fill="#3A3A3A"/>
+  <!-- Eye slit opening -->
+  <rect x="12" y="26" width="36" height="6" rx="2" fill="#0A0A0A"/>
+  <!-- Left eye -->
+  <ellipse cx="22" cy="29" rx="5" ry="2.5" fill="white"/>
+  <circle cx="22" cy="29" r="1.5" fill="#1A1A1A"/>
+  <!-- Right eye -->
+  <ellipse cx="38" cy="29" rx="5" ry="2.5" fill="white"/>
+  <circle cx="38" cy="29" r="1.5" fill="#1A1A1A"/>
+  <!-- Forehead fold -->
+  <path d="M16,18 C22,20 38,20 44,18" fill="none" stroke="#3A3A3A" stroke-width="1" opacity="0.5"/>
+  <!-- Chin fold -->
+  <path d="M22,42 C26,44 34,44 38,42" fill="none" stroke="#3A3A3A" stroke-width="1" opacity="0.5"/>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <defs>
+    <linearGradient id="wg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00BFFF"/>
+      <stop offset="50%" style="stop-color:#1E90FF"/>
+      <stop offset="100%" style="stop-color:#0066CC"/>
+    </linearGradient>
+  </defs>
+  <!-- Back wave -->
+  <path d="M2,34 C10,26 18,26 26,34 C34,42 42,42 58,34 L58,56 L2,56 Z" fill="#0066CC" opacity="0.5"/>
+  <!-- Main wave -->
+  <path d="M2,38 C10,28 18,28 26,38 C34,48 42,48 58,38 L58,56 L2,56 Z" fill="url(#wg)"/>
+  <!-- Wave crest -->
+  <path d="M2,38 C10,28 18,28 26,38" fill="none" stroke="#87CEEB" stroke-width="2" opacity="0.6"/>
+  <!-- Foam -->
+  <circle cx="14" cy="32" r="2" fill="white" opacity="0.5"/>
+  <circle cx="18" cy="30" r="1.5" fill="white" opacity="0.4"/>
+  <circle cx="10" cy="33" r="1" fill="white" opacity="0.3"/>
+  <!-- Water drops -->
+  <path d="M20,18 C20,14 24,10 24,10 C24,10 28,14 28,18 C28,22 24,24 24,24 C24,24 20,22 20,18Z" fill="#00BFFF" stroke="#0066CC" stroke-width="1"/>
+  <ellipse cx="23" cy="16" rx="1.5" ry="2" fill="white" opacity="0.4"/>
+</svg>

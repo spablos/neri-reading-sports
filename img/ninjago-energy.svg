@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <defs>
+    <radialGradient id="eng" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ADFF2F"/>
+      <stop offset="40%" style="stop-color:#32CD32"/>
+      <stop offset="80%" style="stop-color:#228B22"/>
+      <stop offset="100%" style="stop-color:#006400"/>
+    </radialGradient>
+    <filter id="englow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Outer glow -->
+  <circle cx="30" cy="30" r="26" fill="#00FF00" opacity="0.15" filter="url(#englow)"/>
+  <!-- Main orb -->
+  <circle cx="30" cy="30" r="20" fill="url(#eng)" stroke="#006400" stroke-width="1.5"/>
+  <!-- Inner glow -->
+  <circle cx="30" cy="30" r="12" fill="#7CFC00" opacity="0.4"/>
+  <!-- Highlight -->
+  <ellipse cx="24" cy="22" rx="6" ry="5" fill="white" opacity="0.3"/>
+  <!-- Energy lines -->
+  <path d="M30,8 L30,4" stroke="#00FF00" stroke-width="2" opacity="0.6"/>
+  <path d="M30,52 L30,56" stroke="#00FF00" stroke-width="2" opacity="0.6"/>
+  <path d="M8,30 L4,30" stroke="#00FF00" stroke-width="2" opacity="0.6"/>
+  <path d="M52,30 L56,30" stroke="#00FF00" stroke-width="2" opacity="0.6"/>
+  <path d="M14,14 L11,11" stroke="#00FF00" stroke-width="1.5" opacity="0.4"/>
+  <path d="M46,14 L49,11" stroke="#00FF00" stroke-width="1.5" opacity="0.4"/>
+  <path d="M14,46 L11,49" stroke="#00FF00" stroke-width="1.5" opacity="0.4"/>
+  <path d="M46,46 L49,49" stroke="#00FF00" stroke-width="1.5" opacity="0.4"/>
+</svg>
