@@ -126,18 +126,27 @@
         </div>
     </div>
 
-    <script src="players.js"></script>
-    <script src="descriptions.js"></script>
-    <script src="funfacts.js"></script>
-    <script src="hebrew.js"></script>
-    <script src="sections.js"></script>
-    <script src="app.js"></script>
     <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        }
-        // Current client version (must match version.json on deploy)
-        const CLIENT_VERSION = '1.2';
+    // Cache-bust ALL JS files
+    const _v = Date.now();
+    ['players.js','descriptions.js','funfacts.js','hebrew.js','sections.js','app.js'].forEach(f => {
+        document.write('<scr'+'ipt src="'+f+'?v='+_v+'"></scr'+'ipt>');
+    });
+    </script>
+    <script>
+        // Clear all caches and service workers on every load
+        (async function() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) await r.unregister();
+                }
+                const keys = await caches.keys();
+                for (const k of keys) await caches.delete(k);
+            } catch(e) {}
+        })();
+
+        const CLIENT_VERSION = '1.3';
 
         // Check for newer version on server every 5 minutes
         async function checkForUpdate() {
