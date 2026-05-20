@@ -31,6 +31,7 @@ import subprocess
 import sys
 
 MARKER = "# === Hirtakos meal-order — managed block (do not edit by hand) ==="
+END_MARKER = "# === end Hirtakos ==="
 
 BLOCK = """
     %s
@@ -44,17 +45,17 @@ BLOCK = """
         proxy_send_timeout 30s;
     }
     location ^~ /hirtakos/ {
-        alias /var/www/html/hirtakos/;
+        # Use `root` (not `alias`) to avoid the alias+try_files trailing-slash 308 trap.
+        root /var/www/html;
         index index.html;
-        try_files $uri $uri/ /hirtakos/index.html =404;
-        # Sensitive files should never be served
-        location ~ ^/hirtakos/(data/|.*\\.py$|hirtakos\\.service$|nginx\\.conf\\.snippet$|apply_nginx\\.py$|deploy\\.sh$) {
+        # Sensitive files (server.py, .service, .snippet, deploy.sh, /data) must never be served.
+        location ~ ^/hirtakos/(data/|.*\\.py$|.*\\.service$|.*\\.snippet$|deploy\\.sh$) {
             deny all;
             return 404;
         }
     }
-    # === end Hirtakos ===
-""" % MARKER
+    %s
+""" % (MARKER, END_MARKER)
 
 
 SEARCH_DIRS = [
@@ -136,9 +137,24 @@ def main():
     with open(path, "r") as fp:
         content = fp.read()
 
+    # If a managed block from a previous run is present, strip it out first
+    # so we always re-insert the current version (idempotent + upgrade-safe).
     if MARKER in content:
-        print(f"OK: marker already present in {path} - nothing to do (idempotent)")
-        return
+        s = content.find(MARKER)
+        e = content.find(END_MARKER, s)
+        if e < 0:
+            print(f"ERROR: found start marker but not end marker in {path}", file=sys.stderr)
+            sys.exit(5)
+        e += len(END_MARKER)
+        # Extend to whole-line boundaries
+        line_start = content.rfind("\n", 0, s) + 1
+        line_end = content.find("\n", e)
+        if line_end < 0:
+            line_end = len(content)
+        else:
+            line_end += 1
+        content = content[:line_start] + content[line_end:]
+        print(f"Removed existing managed block from {path} (bytes {line_start}..{line_end})")
 
     target = find_target_block(content)
     if target is None:
