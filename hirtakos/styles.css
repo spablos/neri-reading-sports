@@ -212,7 +212,7 @@ a:hover { text-decoration: underline; }
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 .switch input:checked + .slider { background: var(--good); }
-.switch input:checked + .slider::before { transform: translateX(-20px); }
+.switch input:checked + .slider::before { transform: translateX(20px); }
 
 /* option rows */
 .opt-row {
