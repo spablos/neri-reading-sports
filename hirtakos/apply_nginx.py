@@ -57,6 +57,37 @@ BLOCK = """
 """ % MARKER
 
 
+SEARCH_DIRS = [
+    "/etc/nginx/sites-enabled",
+    "/etc/nginx/conf.d",
+    "/etc/nginx/sites-available",
+]
+
+
+def auto_detect_config(needle="spablos"):
+    """Scan nginx config dirs for a .conf file containing `needle`.
+
+    Some setups have BOTH sites-available/foo.conf AND sites-enabled/foo.conf
+    as regular (non-symlinked) files with diverging contents — and only the
+    sites-enabled one is actually loaded. We prefer sites-enabled.
+    """
+    for d in SEARCH_DIRS:
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith(".conf"):
+                continue
+            path = os.path.join(d, name)
+            try:
+                with open(os.path.realpath(path), "r") as fp:
+                    content = fp.read()
+            except (OSError, IOError):
+                continue
+            if needle in content and "server_name" in content:
+                return os.path.realpath(path)
+    return None
+
+
 def find_target_block(content, needle="spablos"):
     """Find the (start, end) byte offsets of the server { } block containing `needle`."""
     m = re.search(re.escape(needle), content)
@@ -88,7 +119,16 @@ def find_target_block(content, needle="spablos"):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else "/etc/nginx/sites-available/whist-dot.conf"
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
+    else:
+        path = auto_detect_config("spablos")
+        if path is None:
+            print("ERROR: could not auto-detect a config file containing 'spablos'.", file=sys.stderr)
+            print("Looked in: " + ", ".join(SEARCH_DIRS), file=sys.stderr)
+            print("Pass the path explicitly: sudo python3 apply_nginx.py /path/to/site.conf", file=sys.stderr)
+            sys.exit(2)
+        print(f"Auto-detected target file: {path}")
     if not os.path.exists(path):
         print(f"ERROR: nginx config file not found at {path}", file=sys.stderr)
         sys.exit(2)
