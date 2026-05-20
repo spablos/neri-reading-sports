@@ -29,7 +29,7 @@ window.MENUS = {
                     { id: 'pepper',   name: 'פלפל',    greekName: 'πιπεριά',     type: 'toggle', default: true  },
                     { id: 'olives',   name: 'זיתים',   greekName: 'ελιές',       type: 'toggle', default: true  },
                     { id: 'feta',     name: 'גבינת פטה', greekName: 'φέτα',     type: 'toggle', default: true  },
-                    { id: 'capers',   name: 'קפרס',    greekName: 'κάππαρη',     type: 'toggle', default: false },
+                    { id: 'mint',     name: 'נענע',    greekName: 'δυόσμος',     type: 'toggle', default: false },
                     { id: 'oregano',  name: 'אורגנו',  greekName: 'ρίγανη',      type: 'toggle', default: true  },
                 ]
             },

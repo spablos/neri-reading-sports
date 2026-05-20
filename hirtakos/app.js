@@ -609,7 +609,7 @@ function transliterate(name) {
     // Simple mapping - includes our specific names
     const map = {
         'פבלו': 'Pablo',
-        'שרת': 'Sharet',
+        'אשרת': 'Asheret',
         'שקד': 'Shaked',
         'רותם': 'Rotem',
         'יובל': 'Yuval',

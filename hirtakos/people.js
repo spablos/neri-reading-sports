@@ -7,7 +7,7 @@ window.FAMILIES = [
         color: '#1E88E5',
         members: [
             { id: 'pablo',  name: 'פבלו'  },
-            { id: 'sharet', name: 'שרת'   },
+            { id: 'sharet', name: 'אשרת' },
             { id: 'shaked', name: 'שקד'   },
             { id: 'rotem',  name: 'רותם'  },
             { id: 'yuval',  name: 'יובל'  },
