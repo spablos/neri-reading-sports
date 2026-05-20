@@ -16,6 +16,20 @@ const API = (() => {
     return `${proto}//${host}:9100`;
 })();
 
+// ------------------------------------------------------------
+// Per-device identity (no auth — just remember the chosen name)
+// ------------------------------------------------------------
+const IDENTITY_KEY = 'hirtakos_person_id';
+function getIdentity() {
+    try { return localStorage.getItem(IDENTITY_KEY) || null; } catch (_e) { return null; }
+}
+function setIdentity(id) {
+    try { if (id) localStorage.setItem(IDENTITY_KEY, id); } catch (_e) {}
+}
+function clearIdentity() {
+    try { localStorage.removeItem(IDENTITY_KEY); } catch (_e) {}
+}
+
 async function apiGet(path) {
     const r = await fetch(`${API}${path}`, { credentials: 'omit' });
     if (!r.ok) throw new Error(`API ${path} → HTTP ${r.status}`);
@@ -50,6 +64,20 @@ function toast(msg, type) {
 // Index page
 // ------------------------------------------------------------
 async function indexInit() {
+    // If this device already has an identity, jump straight to that person's
+    // order page. Use ?switch=1 to clear and re-pick.
+    const params = new URLSearchParams(window.location.search);
+    const wantSwitch = params.get('switch') === '1' || params.get('switch') === 'true';
+    if (wantSwitch) {
+        clearIdentity();
+    } else {
+        const savedId = getIdentity();
+        if (savedId && window.findPerson(savedId)) {
+            window.location.replace(`order.html?person=${encodeURIComponent(savedId)}`);
+            return;
+        }
+    }
+
     let state;
     try {
         state = await apiGet('/state');
@@ -107,6 +135,7 @@ async function indexInit() {
             a.className = 'person-tile' + (ordered ? ' ordered' : '');
             a.style.setProperty('--family-color', fam.color);
             a.href = `order.html?person=${m.id}`;
+            a.addEventListener('click', () => setIdentity(m.id));
             a.innerHTML = `
                 <div class="name">${m.name}</div>
                 <div class="status">${ordered ? '<span class="check">✓</span> הזמין' : 'טרם הזמין'}</div>
@@ -131,6 +160,7 @@ async function orderInit() {
         document.querySelector('.save-bar').classList.add('hidden');
         return;
     }
+    setIdentity(person.id);  // remember on this device
     document.getElementById('person-name').textContent = person.name;
     document.getElementById('person-fam').textContent = person.familyName;
 
