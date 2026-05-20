@@ -32,6 +32,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Detect whether the nginx side has already been set up (idempotent).
+# apply_nginx.py inserts a managed block containing this marker.
+NGINX_MARKER="Hirtakos meal-order"
+
+print_nginx_reminder() {
+    local src="$1"
+    local already=0
+    if [[ -d /etc/nginx ]] && sudo grep -rq "$NGINX_MARKER" /etc/nginx/ 2>/dev/null; then
+        already=1
+    fi
+    echo "==> Files deployed."
+    if [[ $already -eq 1 ]]; then
+        echo "    nginx already has the Hirtakos block — no further nginx changes needed."
+        echo "    Visit: https://spablos.com/hirtakos/"
+    else
+        echo "    NEXT (one-time nginx setup):"
+        echo "      sudo python3 $src/apply_nginx.py"
+        echo "      sudo systemctl reload nginx"
+        echo "    Then visit: https://spablos.com/hirtakos/"
+    fi
+}
+
 if [[ -n "$REMOTE_HOST" ]]; then
     if [[ -z "$REMOTE_USER" ]]; then echo "--user required with --host"; exit 1; fi
     echo "==> Remote deploy: $REMOTE_USER@$REMOTE_HOST:$DEST_DIR"
@@ -52,10 +74,7 @@ if [[ -n "$REMOTE_HOST" ]]; then
         sudo systemctl status $SERVICE_NAME --no-pager -l | head -n 20
     "
     echo
-    echo "==> Files deployed. Don't forget to:"
-    echo "    1. Add the contents of $SRC_DIR/nginx.conf.snippet to your nginx config for spablos.com"
-    echo "    2. Run:  sudo nginx -t && sudo systemctl reload nginx"
-    echo "    3. Visit: https://spablos.com/hirtakos/"
+    print_nginx_reminder "$SRC_DIR"
     exit 0
 fi
 
@@ -80,7 +99,4 @@ echo
 echo "==> Service status:"
 systemctl status $SERVICE_NAME --no-pager -l | head -n 20
 echo
-echo "==> Files deployed. Don't forget to:"
-echo "    1. Add the contents of $SRC_DIR/nginx.conf.snippet to your nginx config for spablos.com"
-echo "    2. Run:  sudo nginx -t && sudo systemctl reload nginx"
-echo "    3. Visit: https://spablos.com/hirtakos/"
+print_nginx_reminder "$SRC_DIR"
