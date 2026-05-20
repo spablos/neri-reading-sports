@@ -1,0 +1,24 @@
+[Unit]
+Description=Hirtakos meal order API
+After=network.target
+
+[Service]
+Type=simple
+User=pablo
+Group=pablo
+WorkingDirectory=/var/www/html/hirtakos
+Environment=HIRTAKOS_DATA_DIR=/var/www/html/hirtakos/data
+Environment=HIRTAKOS_PORT=9100
+Environment=HIRTAKOS_BIND=127.0.0.1
+ExecStart=/usr/bin/python3 /var/www/html/hirtakos/server.py
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/www/html/hirtakos/data
+
+[Install]
+WantedBy=multi-user.target

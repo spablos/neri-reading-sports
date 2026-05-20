@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>ההזמנה שלי - חירטאקוס</title>
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;900&family=Noto+Sans+Hebrew:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-inner">
+        <div>
+            <h1><span class="flag">🇬🇷</span> חירטאקוס</h1>
+            <div class="subtitle"><span id="event-name">ארוחה</span></div>
+        </div>
+        <div class="actions">
+            <a href="index.html">← חזרה</a>
+        </div>
+    </div>
+</header>
+
+<main class="container narrow">
+
+    <div class="greeting">
+        שלום <span class="name" id="person-name">…</span> 👋
+    </div>
+    <div class="subgreet" id="person-fam"></div>
+
+    <div id="order-form"></div>
+
+    <div class="save-bar">
+        <button class="btn primary block" id="save-btn">
+            <span id="save-label">💾 שמירת ההזמנה</span>
+            <span class="spinner hidden" id="save-spinner"></span>
+        </button>
+        <div class="row spread" style="margin-top:10px;">
+            <a href="index.html" class="btn secondary">חזרה לרשימה</a>
+            <button class="btn secondary" id="reset-btn">איפוס</button>
+        </div>
+    </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="people.js"></script>
+<script src="menu.js"></script>
+<script src="app.js"></script>
+<script>
+    orderInit();
+</script>
+
+</body>
+</html>

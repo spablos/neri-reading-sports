@@ -1,0 +1,28 @@
+# ============================================================
+# Hirtakos - nginx snippet
+# Drop into the appropriate server { ... } block for spablos.com.
+# ============================================================
+
+# Static files - served from /var/www/html/hirtakos
+location /hirtakos/ {
+    alias /var/www/html/hirtakos/;
+    index index.html;
+    try_files $uri $uri/ /hirtakos/index.html;
+
+    # Sensitive files - never serve via HTTP
+    location ~ /hirtakos/(data|hirtakos\.service|.*\.py)$ {
+        deny all;
+        return 404;
+    }
+}
+
+# API - reverse proxy to the Python server on 127.0.0.1:9100
+location /hirtakos/api/ {
+    proxy_pass http://127.0.0.1:9100/;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    proxy_send_timeout 30s;
+}

@@ -11,3 +11,8 @@ voice-compare.html
 PRAISE_REVIEW.md
 icon.svg
 *.output
+
+# hirtakos sub-project ships its own server + deploy scripts + icon
+!hirtakos/*.py
+!hirtakos/*.sh
+!hirtakos/icon.svg

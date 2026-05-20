@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>חירטאקוס - הזמנת ארוחה</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;900&family=Noto+Sans+Hebrew:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-inner">
+        <div>
+            <h1><span class="flag">🇬🇷</span> חירטאקוס</h1>
+            <div class="subtitle">הזמנת ארוחה משפחתית</div>
+        </div>
+        <div class="actions">
+            <a href="admin.html" title="ניהול">⚙️</a>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+
+    <div class="card elevated">
+        <h2>
+            <span class="emoji" id="event-emoji">🍽️</span>
+            <span id="event-title">טוען...</span>
+            <span class="badge open hidden" id="event-status-open">פתוח להזמנות</span>
+            <span class="badge closed hidden" id="event-status-closed">סגור</span>
+        </h2>
+        <div class="muted" id="event-subtitle"></div>
+    </div>
+
+    <div id="people-container"></div>
+
+    <div class="card hidden" id="no-event-card">
+        <h2>אין כרגע ארוחה פעילה</h2>
+        <p class="muted">בקש מהמארגן לפתוח ארוחה חדשה דרך עמוד הניהול.</p>
+        <a href="admin.html" class="btn secondary">למסך ניהול</a>
+    </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="people.js"></script>
+<script src="menu.js"></script>
+<script src="app.js"></script>
+<script>
+    indexInit();
+</script>
+
+</body>
+</html>

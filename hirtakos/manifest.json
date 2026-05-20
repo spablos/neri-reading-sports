@@ -1,0 +1,17 @@
+{
+  "name": "חירטאקוס - הזמנת ארוחה",
+  "short_name": "חירטאקוס",
+  "description": "אפליקציה להזמנת ארוחות משפחתיות",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5ebd6",
+  "theme_color": "#1e6fb8",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    { "src": "icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

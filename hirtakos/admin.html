@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ניהול - חירטאקוס</title>
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;900&family=Noto+Sans+Hebrew:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-inner">
+        <div>
+            <h1><span class="flag">🇬🇷</span> חירטאקוס</h1>
+            <div class="subtitle">ניהול הזמנות</div>
+        </div>
+        <div class="actions">
+            <a href="index.html">→ דף הבית</a>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+
+    <div class="tab-bar" id="tab-bar">
+        <button class="active" data-tab="overview">סיכום</button>
+        <button data-tab="orders">הזמנות</button>
+        <button data-tab="greek">תרגום ליוונית 🇬🇷</button>
+        <button data-tab="settings">ניהול</button>
+    </div>
+
+    <!-- TAB: OVERVIEW -->
+    <div id="tab-overview" class="tab-pane">
+        <div class="card elevated">
+            <h2>
+                <span class="emoji" id="ovw-emoji">🍽️</span>
+                <span id="ovw-title">…</span>
+                <span class="badge open hidden" id="ovw-status-open">פתוח</span>
+                <span class="badge closed hidden" id="ovw-status-closed">סגור</span>
+            </h2>
+            <div class="muted" id="ovw-when"></div>
+        </div>
+        <div class="admin-summary" id="ovw-stats"></div>
+        <div class="card">
+            <h2>מי הזמין</h2>
+            <div id="ovw-progress"></div>
+        </div>
+    </div>
+
+    <!-- TAB: ORDERS -->
+    <div id="tab-orders" class="tab-pane hidden">
+        <div class="card">
+            <h2>פירוט ההזמנות</h2>
+            <div id="orders-list"></div>
+        </div>
+    </div>
+
+    <!-- TAB: GREEK -->
+    <div id="tab-greek" class="tab-pane hidden">
+        <div class="card">
+            <h2>הזמנה ביוונית 🇬🇷</h2>
+            <p class="muted">לחיצה על "צור תרגום" מייצרת טקסט מסכם ביוונית שאפשר להעתיק ולשלוח ב-WhatsApp.</p>
+            <div class="row" style="margin-bottom:10px; gap:8px; flex-wrap: wrap;">
+                <button class="btn primary" id="greek-build-btn">
+                    <span id="greek-build-label">🇬🇷 צור תרגום</span>
+                    <span class="spinner hidden" id="greek-spinner"></span>
+                </button>
+                <button class="btn secondary" id="greek-copy-btn">📋 העתק</button>
+                <button class="btn secondary" id="greek-wa-btn">📱 פתח ב-WhatsApp</button>
+            </div>
+            <div class="greek-output" id="greek-output">[טרם נוצר תרגום]</div>
+        </div>
+    </div>
+
+    <!-- TAB: SETTINGS -->
+    <div id="tab-settings" class="tab-pane hidden">
+        <div class="card">
+            <h2>ניהול הארוחה</h2>
+            <div class="row spread" style="margin-bottom:14px;">
+                <div>
+                    <div><strong id="set-title">…</strong></div>
+                    <div class="muted" id="set-when"></div>
+                </div>
+                <div>
+                    <button class="btn secondary" id="toggle-status-btn">…</button>
+                </div>
+            </div>
+            <hr style="border:none; border-top:1px solid #e5e9f0; margin: 12px 0;">
+            <h3 style="margin-top:0;">פתיחת ארוחה חדשה</h3>
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+                <select id="new-menu-select" class="text-input" style="width:auto; min-width:200px;"></select>
+                <input type="text" id="new-event-name" class="text-input" placeholder="שם הארוחה (אופציונלי)" style="width:auto; flex:1; min-width: 180px;">
+                <button class="btn primary" id="new-event-btn">➕ ארוחה חדשה</button>
+            </div>
+            <p class="muted" style="margin-top: 8px;">פתיחה של ארוחה חדשה תאפס את ההזמנות הקודמות (הן ישמרו בהיסטוריה).</p>
+        </div>
+
+        <div class="card">
+            <h2>היסטוריה</h2>
+            <div id="history-list" class="muted">…</div>
+        </div>
+    </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="people.js"></script>
+<script src="menu.js"></script>
+<script src="app.js"></script>
+<script>
+    adminInit();
+</script>
+
+</body>
+</html>
